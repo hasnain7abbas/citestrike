@@ -14,10 +14,12 @@
       {
         "title": "CiteStrike",
         "label": "main",
-        "width": 680,
-        "height": 500,
+        "width": 960,
+        "height": 640,
+        "minWidth": 780,
+        "minHeight": 500,
         "resizable": true,
-        "decorations": true,
+        "decorations": false,
         "transparent": false,
         "center": true,
         "visible": true,
@@ -27,11 +29,6 @@
     ],
     "security": {
       "csp": null
-    },
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true,
-      "tooltip": "CiteStrike"
     }
   },
   "bundle": {

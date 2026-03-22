@@ -3,6 +3,8 @@ mod commands;
 mod crossref;
 mod db;
 mod pdf;
+mod rich_clipboard;
+mod word_insert;
 
 use commands::DbState;
 use rusqlite::Connection;
@@ -23,6 +25,7 @@ pub fn run() {
                                 window.hide().ok();
                             } else {
                                 window.show().ok();
+                                window.center().ok();
                                 window.set_focus().ok();
                             }
                         }
@@ -55,7 +58,10 @@ pub fn run() {
             use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
             let shortcut =
                 Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyC);
-            app.handle().global_shortcut().register(shortcut).ok();
+            match app.handle().global_shortcut().register(shortcut) {
+                Ok(_) => log::info!("Global shortcut Ctrl+Shift+C registered"),
+                Err(e) => log::warn!("Failed to register global shortcut: {}", e),
+            }
 
             Ok(())
         })
@@ -63,10 +69,25 @@ pub fn run() {
             commands::search_references,
             commands::add_reference,
             commands::delete_reference,
+            commands::move_reference,
             commands::format_ref,
             commands::fetch_doi,
             commands::search_online,
             commands::import_pdf,
+            commands::create_folder,
+            commands::get_folders,
+            commands::rename_folder,
+            commands::delete_folder,
+            commands::get_ref_count,
+            commands::format_inline_citation,
+            commands::format_batch_bibliography,
+            commands::copy_rich_citation,
+            commands::copy_rich_inline,
+            commands::copy_rich_bibliography,
+            commands::insert_citation_into_word,
+            commands::insert_inline_into_word,
+            commands::insert_citation_into_ppt,
+            commands::insert_bibliography_into_word,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

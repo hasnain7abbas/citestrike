@@ -14,6 +14,7 @@ export interface Reference {
 	url: string | null;
 	ref_type: string;
 	bibtex_key: string;
+	folder_id: string | null;
 	created_at: string;
 }
 
@@ -31,18 +32,29 @@ export interface NewReference {
 	ref_type: string;
 }
 
-export type CitationStyle = 'APA' | 'MLA' | 'Chicago' | 'IEEE' | 'Harvard' | 'BibTeX';
-
-export async function searchReferences(query: string): Promise<Reference[]> {
-	return invoke('search_references', { query });
+export interface Folder {
+	id: string;
+	name: string;
+	color: string;
+	created_at: string;
 }
 
-export async function addReference(newRef: NewReference): Promise<Reference> {
-	return invoke('add_reference', { newRef });
+export type CitationStyle = 'APA' | 'MLA' | 'Chicago' | 'IEEE' | 'Harvard' | 'BibTeX';
+
+export async function searchReferences(query: string, folderId?: string | null): Promise<Reference[]> {
+	return invoke('search_references', { query, folderId: folderId ?? null });
+}
+
+export async function addReference(newRef: NewReference, folderId?: string | null): Promise<Reference> {
+	return invoke('add_reference', { newRef, folderId: folderId ?? null });
 }
 
 export async function deleteReference(id: string): Promise<void> {
 	return invoke('delete_reference', { id });
+}
+
+export async function moveReference(refId: string, folderId?: string | null): Promise<void> {
+	return invoke('move_reference', { refId, folderId: folderId ?? null });
 }
 
 export async function formatRef(reference: Reference, style: CitationStyle): Promise<string> {
@@ -59,4 +71,62 @@ export async function searchOnline(query: string): Promise<NewReference[]> {
 
 export async function importPdf(path: string): Promise<string> {
 	return invoke('import_pdf', { path });
+}
+
+export async function createFolder(name: string, color: string): Promise<Folder> {
+	return invoke('create_folder', { name, color });
+}
+
+export async function getFolders(): Promise<Folder[]> {
+	return invoke('get_folders');
+}
+
+export async function renameFolder(id: string, name: string): Promise<void> {
+	return invoke('rename_folder', { id, name });
+}
+
+export async function deleteFolder(id: string): Promise<void> {
+	return invoke('delete_folder', { id });
+}
+
+export async function getRefCount(folderId?: string | null): Promise<number> {
+	return invoke('get_ref_count', { folderId: folderId ?? null });
+}
+
+export async function formatInlineCitation(reference: Reference, style: CitationStyle, number?: number): Promise<string> {
+	return invoke('format_inline_citation', { reference, style, number: number ?? null });
+}
+
+export async function formatBatchBibliography(references: Reference[], style: CitationStyle): Promise<string> {
+	return invoke('format_batch_bibliography', { references, style });
+}
+
+// Rich text clipboard (RTF — preserves italics in Word/PPT)
+export async function copyRichCitation(reference: Reference, style: CitationStyle): Promise<void> {
+	return invoke('copy_rich_citation', { reference, style });
+}
+
+export async function copyRichInline(reference: Reference, style: CitationStyle, number?: number): Promise<void> {
+	return invoke('copy_rich_inline', { reference, style, number: number ?? null });
+}
+
+export async function copyRichBibliography(references: Reference[], style: CitationStyle): Promise<void> {
+	return invoke('copy_rich_bibliography', { references, style });
+}
+
+// Direct Word/PowerPoint insertion
+export async function insertCitationIntoWord(reference: Reference, style: CitationStyle): Promise<string> {
+	return invoke('insert_citation_into_word', { reference, style });
+}
+
+export async function insertInlineIntoWord(reference: Reference, style: CitationStyle, number?: number): Promise<string> {
+	return invoke('insert_inline_into_word', { reference, style, number: number ?? null });
+}
+
+export async function insertCitationIntoPpt(reference: Reference, style: CitationStyle): Promise<string> {
+	return invoke('insert_citation_into_ppt', { reference, style });
+}
+
+export async function insertBibliographyIntoWord(references: Reference[], style: CitationStyle): Promise<string> {
+	return invoke('insert_bibliography_into_word', { references, style });
 }

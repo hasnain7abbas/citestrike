@@ -1,4 +1,7 @@
 node_modules/
-src-tauri/target/
-dist/
-.svelte-kit/
+  build/
+  .svelte-kit/
+  src-tauri/target/
+  dist/
+  .env
+  *.db

@@ -1,22 +1,68 @@
 @import 'tailwindcss';
 
+@font-face {
+	font-family: 'Inter';
+	src: local('Inter');
+}
+
 :root {
-	--bg-primary: #0F172A;
-	--bg-secondary: #1E293B;
-	--bg-elevated: #334155;
-	--text-primary: #F1F5F9;
-	--text-secondary: #94A3B8;
-	--accent: #38BDF8;
-	--accent-alt: #24C8DB;
-	--border: #475569;
-	--danger: #EF4444;
-	--success: #22C55E;
+	--bg: #FAFBFC;
+	--bg-card: #FFFFFF;
+	--bg-sidebar: #F3F4F8;
+	--bg-hover: #EEF0F4;
+	--bg-active: #E8EAEF;
+	--bg-input: #FFFFFF;
+	--text: #1A1D26;
+	--text-secondary: #6B7085;
+	--text-muted: #9CA0B0;
+	--accent: #3B6CF0;
+	--accent-light: #EBF0FE;
+	--accent-hover: #2D5AD8;
+	--border: #E2E4EA;
+	--border-light: #EDEEF2;
+	--danger: #E5484D;
+	--danger-light: #FEF0F0;
+	--success: #30A46C;
+	--success-light: #E9F9EF;
+	--warning: #F5A623;
+	--warning-light: #FFF8EB;
+	--shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+	--shadow-md: 0 2px 8px rgba(0,0,0,0.06);
+	--shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+	--radius: 10px;
+	--radius-sm: 6px;
+	--radius-lg: 14px;
+}
+
+* {
+	box-sizing: border-box;
 }
 
 html, body {
 	margin: 0;
 	padding: 0;
-	background: transparent;
+	background: var(--bg);
 	overflow: hidden;
 	font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+	color: var(--text);
+	font-size: 13px;
+	-webkit-font-smoothing: antialiased;
+}
+
+input, button, select, textarea {
+	font-family: inherit;
+}
+
+::-webkit-scrollbar {
+	width: 5px;
+}
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+::-webkit-scrollbar-thumb {
+	background: var(--border);
+	border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: var(--text-muted);
 }
