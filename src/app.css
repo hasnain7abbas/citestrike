@@ -1,0 +1,22 @@
+@import 'tailwindcss';
+
+:root {
+	--bg-primary: #0F172A;
+	--bg-secondary: #1E293B;
+	--bg-elevated: #334155;
+	--text-primary: #F1F5F9;
+	--text-secondary: #94A3B8;
+	--accent: #38BDF8;
+	--accent-alt: #24C8DB;
+	--border: #475569;
+	--danger: #EF4444;
+	--success: #22C55E;
+}
+
+html, body {
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	overflow: hidden;
+	font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
