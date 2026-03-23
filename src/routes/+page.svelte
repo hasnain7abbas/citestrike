@@ -232,7 +232,7 @@
 								<h2 class="text-sm font-semibold text-[var(--text)]">Bibliography Builder</h2>
 								<p class="text-[11px] text-[var(--text-muted)] mt-0.5">
 									Add references, reorder them, then export as a formatted bibliography.
-									{#if bibStyle === 'IEEE'} IEEE references are auto-numbered [1], [2], etc.{/if}
+									{#if bibStyle === 'IEEE'} IEEE references are auto-numbered [1], [2], etc.{:else if bibStyle === 'Vancouver'} Vancouver references are auto-numbered 1., 2., etc.{/if}
 								</p>
 							</div>
 							<select bind:value={bibStyle}
@@ -243,6 +243,7 @@
 								<option value="Chicago">Chicago</option>
 								<option value="IEEE">IEEE</option>
 								<option value="Harvard">Harvard</option>
+								<option value="Vancouver">Vancouver</option>
 								<option value="BibTeX">BibTeX</option>
 							</select>
 						</div>
@@ -303,7 +304,7 @@
 									{#each bibRefs as ref, i}
 										<div class="flex items-center gap-2 px-4 py-2 border-b border-[var(--border-light)] group hover:bg-[var(--bg-hover)]">
 											<span class="text-[11px] font-mono text-[var(--accent)] w-6 shrink-0">
-												{#if bibStyle === 'IEEE'}[{i+1}]{:else}{i+1}.{/if}
+												{#if bibStyle === 'IEEE'}[{i+1}]{:else if bibStyle === 'Vancouver'}{i+1}.{:else}{i+1}.{/if}
 											</span>
 											<div class="min-w-0 flex-1">
 												<p class="text-[11px] text-[var(--text)] truncate">{ref.title}</p>

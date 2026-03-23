@@ -39,7 +39,7 @@ export interface Folder {
 	created_at: string;
 }
 
-export type CitationStyle = 'APA' | 'MLA' | 'Chicago' | 'IEEE' | 'Harvard' | 'BibTeX';
+export type CitationStyle = 'APA' | 'MLA' | 'Chicago' | 'IEEE' | 'Harvard' | 'Vancouver' | 'BibTeX';
 
 export async function searchReferences(query: string, folderId?: string | null): Promise<Reference[]> {
 	return invoke('search_references', { query, folderId: folderId ?? null });

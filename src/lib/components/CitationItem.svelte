@@ -142,7 +142,7 @@
 							<svg class="w-3 h-3" viewBox="0 0 24 24" fill="#2B579A"><path d="M23 1.5q.41 0 .7.3.3.29.3.7v19q0 .41-.3.7-.29.3-.7.3H7q-.41 0-.7-.3-.3-.29-.3-.7V18H1q-.41 0-.7-.3-.3-.29-.3-.7V7q0-.41.3-.7Q.58 6 1 6h5V2.5q0-.41.3-.7.29-.3.7-.3zM6 13.28l1.42 2.66h2.14l-2.38-3.87 2.34-3.8H7.46l-1.3 2.4-.05.08-.04.09-.64-1.28-.66-1.29H2.59l2.27 3.82-2.48 3.85h2.16zM14 2.5H7V6h1.5q.41 0 .7.3.3.29.3.7v10q0 .41-.3.7-.29.3-.7.3H7v3.5h7V18h-1v-1h1v-2h-1v-1h1v-2h-1v-1h1V9h-1V8h1V6h-1V5h1zM21 20V17h-4v3zm0-4V13h-4v3zm0-4V9h-4v3zm0-4V5h-4v3z"/></svg>
 							Insert into Word
 						</p>
-						{#each (['APA', 'MLA', 'IEEE', 'Chicago', 'Harvard'] as const) as style}
+						{#each (['APA', 'MLA', 'IEEE', 'Chicago', 'Harvard', 'Vancouver'] as const) as style}
 							<button onclick={() => insertWord('full', style)}
 								class="w-full text-left px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors pl-6">
 								{style} full citation
@@ -173,7 +173,7 @@
 
 						<!-- Copy in-text -->
 						<p class="px-3 py-1 text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Copy in-text</p>
-						{#each (['APA', 'MLA', 'Chicago', 'IEEE', 'Harvard', 'BibTeX'] as const) as style}
+						{#each (['APA', 'MLA', 'Chicago', 'IEEE', 'Harvard', 'Vancouver', 'BibTeX'] as const) as style}
 							<button onclick={() => copyInline(style)}
 								class="w-full text-left px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors pl-6">
 								{style}
@@ -184,7 +184,7 @@
 
 						<!-- Copy full (rich text) -->
 						<p class="px-3 py-1 text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Copy full (rich text)</p>
-						{#each (['Chicago', 'IEEE', 'Harvard'] as const) as style}
+						{#each (['Chicago', 'IEEE', 'Harvard', 'Vancouver'] as const) as style}
 							<button onclick={() => copyRich(style)}
 								class="w-full text-left px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors pl-6">
 								{style}

@@ -7,6 +7,7 @@ pub enum CitationStyle {
     Chicago,
     IEEE,
     Harvard,
+    Vancouver,
     BibTeX,
 }
 
@@ -18,6 +19,7 @@ pub fn format_citation(reference: &Reference, style: CitationStyle) -> String {
         CitationStyle::Chicago => format_chicago(reference),
         CitationStyle::IEEE => format_ieee(reference),
         CitationStyle::Harvard => format_harvard(reference),
+        CitationStyle::Vancouver => format_vancouver(reference),
         CitationStyle::BibTeX => format_bibtex(reference),
     }
 }
@@ -90,6 +92,10 @@ pub fn format_inline(reference: &Reference, style: CitationStyle, number: Option
             };
             format!("({} {})", author_part, year)
         }
+        CitationStyle::Vancouver => {
+            // Vancouver uses numbered citations like IEEE but with parentheses
+            format!("({})", number.unwrap_or(1))
+        }
         CitationStyle::BibTeX => {
             format!("\\cite{{{}}}", reference.bibtex_key)
         }
@@ -104,6 +110,9 @@ pub fn format_bibliography(references: &[Reference], style: CitationStyle) -> St
         let entry = match style {
             CitationStyle::IEEE => {
                 format!("[{}] {}", i + 1, format_citation(reference, style))
+            }
+            CitationStyle::Vancouver => {
+                format!("{}. {}", i + 1, format_citation(reference, style))
             }
             _ => format_citation(reference, style),
         };
@@ -326,6 +335,63 @@ fn format_harvard(r: &Reference) -> String {
         citation.push_str(&format!(" Available at: https://doi.org/{}", doi));
     }
     citation
+}
+
+fn format_vancouver(r: &Reference) -> String {
+    let journal = r.journal.as_deref().unwrap_or("");
+    let volume = r.volume.as_deref().unwrap_or("");
+    let pages = r.pages.as_deref().unwrap_or("");
+    let year = r.year.map(|y| y.to_string()).unwrap_or_default();
+
+    let authors = vancouver_authors(&r.authors);
+    let mut citation = format!("{}. {}", authors, r.title);
+    if !journal.is_empty() {
+        citation.push_str(&format!(". {}", journal));
+    }
+    if !year.is_empty() {
+        citation.push_str(&format!(". {}", year));
+    }
+    if !volume.is_empty() {
+        citation.push_str(&format!(";{}", volume));
+        if let Some(issue) = &r.issue {
+            citation.push_str(&format!("({})", issue));
+        }
+    }
+    if !pages.is_empty() {
+        citation.push_str(&format!(":{}", pages));
+    }
+    citation.push('.');
+    if let Some(doi) = &r.doi {
+        citation.push_str(&format!(" doi:{}", doi));
+    }
+    citation
+}
+
+fn vancouver_authors(authors: &str) -> String {
+    let parts: Vec<&str> = authors.split(';').map(|a| a.trim()).collect();
+    // Vancouver uses "LastName Initials" format, e.g. "Smith J, Doe AB"
+    let formatted: Vec<String> = parts
+        .iter()
+        .take(6)
+        .map(|a| {
+            let segs: Vec<&str> = a.split(',').map(|s| s.trim()).collect();
+            if segs.len() >= 2 {
+                let initials: String = segs[1]
+                    .split_whitespace()
+                    .map(|w| w.chars().next().unwrap_or(' '))
+                    .collect();
+                format!("{} {}", segs[0], initials)
+            } else {
+                a.to_string()
+            }
+        })
+        .collect();
+
+    if parts.len() > 6 {
+        format!("{}, et al", formatted.join(", "))
+    } else {
+        formatted.join(", ")
+    }
 }
 
 fn format_bibtex(r: &Reference) -> String {

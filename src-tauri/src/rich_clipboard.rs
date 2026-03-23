@@ -35,6 +35,7 @@ pub fn citation_to_rtf(reference: &Reference, style: CitationStyle) -> String {
         CitationStyle::Chicago => rtf_chicago(reference),
         CitationStyle::IEEE => rtf_ieee(reference),
         CitationStyle::Harvard => rtf_harvard(reference),
+        CitationStyle::Vancouver => rtf_vancouver(reference),
         CitationStyle::BibTeX => {
             // BibTeX is code, no rich formatting needed
             rtf_escape(&crate::citation::format_citation(reference, style))
@@ -71,6 +72,9 @@ pub fn bibliography_to_rtf(references: &[Reference], style: CitationStyle) -> St
             CitationStyle::MLA => rtf_mla(reference),
             CitationStyle::Chicago => rtf_chicago(reference),
             CitationStyle::Harvard => rtf_harvard(reference),
+            CitationStyle::Vancouver => {
+                format!("{}. {}", i + 1, rtf_vancouver(reference))
+            }
             CitationStyle::BibTeX => rtf_escape(&crate::citation::format_citation(reference, style)),
         };
         body.push_str(&entry);
@@ -186,6 +190,32 @@ fn rtf_ieee_entry(r: &Reference) -> String {
     s
 }
 
+fn rtf_vancouver(r: &Reference) -> String {
+    let authors = vancouver_authors_str(&r.authors);
+    let mut s = format!("{}. {}", rtf_escape(&authors), rtf_escape(&r.title));
+
+    if let Some(journal) = &r.journal {
+        s.push_str(&format!(". {{\\i {}}}", rtf_escape(journal)));
+    }
+    if let Some(year) = r.year {
+        s.push_str(&format!(". {}", year));
+    }
+    if let Some(vol) = &r.volume {
+        s.push_str(&format!(";{}", rtf_escape(vol)));
+        if let Some(issue) = &r.issue {
+            s.push_str(&format!("({})", rtf_escape(issue)));
+        }
+    }
+    if let Some(pages) = &r.pages {
+        s.push_str(&format!(":{}", rtf_escape(pages)));
+    }
+    s.push('.');
+    if let Some(doi) = &r.doi {
+        s.push_str(&format!(" doi:{}", rtf_escape(doi)));
+    }
+    s
+}
+
 fn rtf_harvard(r: &Reference) -> String {
     let authors = apa_authors_str(&r.authors);
     let year = r.year.map(|y| y.to_string()).unwrap_or("n.d.".to_string());
@@ -249,6 +279,32 @@ fn mla_authors_str(authors: &str) -> String {
         1 => parts[0].to_string(),
         2 => format!("{}, and {}", parts[0], parts[1]),
         _ => format!("{}, et al.", parts[0]),
+    }
+}
+
+fn vancouver_authors_str(authors: &str) -> String {
+    let parts: Vec<&str> = authors.split(';').map(|a| a.trim()).collect();
+    let formatted: Vec<String> = parts
+        .iter()
+        .take(6)
+        .map(|a| {
+            let segs: Vec<&str> = a.split(',').map(|s| s.trim()).collect();
+            if segs.len() >= 2 {
+                let initials: String = segs[1]
+                    .split_whitespace()
+                    .map(|w| w.chars().next().unwrap_or(' '))
+                    .collect();
+                format!("{} {}", segs[0], initials)
+            } else {
+                a.to_string()
+            }
+        })
+        .collect();
+
+    if parts.len() > 6 {
+        format!("{}, et al", formatted.join(", "))
+    } else {
+        formatted.join(", ")
     }
 }
 

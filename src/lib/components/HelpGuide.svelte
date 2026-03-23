@@ -34,7 +34,7 @@
 			icon: '📋',
 			content: [
 				{ q: 'How do I copy a formatted citation?', a: 'Hover over any reference to see format buttons: **APA**, **MLA**, and **BIB**. Click one to instantly copy the formatted citation to your clipboard. For more formats (Chicago, IEEE, Harvard), click the ⋮ menu.' },
-				{ q: 'What citation styles are supported?', a: '**Six styles** are built in:\n\n• **APA** (7th edition) — Psychology, social sciences\n• **MLA** (9th edition) — Humanities, literature\n• **Chicago** — History, publishing\n• **IEEE** — Engineering, computer science\n• **Harvard** — General academic\n• **BibTeX** — LaTeX documents' },
+				{ q: 'What citation styles are supported?', a: '**Seven styles** are built in:\n\n• **APA** (7th edition) — Psychology, social sciences\n• **MLA** (9th edition) — Humanities, literature\n• **Chicago** — History, publishing\n• **IEEE** — Engineering, computer science\n• **Harvard** — General academic\n• **Vancouver** — Biomedical, medical sciences\n• **BibTeX** — LaTeX documents' },
 				{ q: 'How do I paste into my document?', a: 'After clicking a format button, the citation is on your clipboard. Simply Ctrl+V (or Cmd+V) into Word, Google Docs, Overleaf, Obsidian, Notion, or any other editor.' },
 			]
 		},
@@ -54,6 +54,17 @@
 				{ q: 'Where does online search look?', a: 'CiteStrike searches the **Crossref** database, which indexes over 130 million scholarly works from thousands of publishers worldwide.' },
 				{ q: 'Why can\'t I find a paper?', a: 'Some papers may not be indexed in Crossref (e.g., preprints, very recent publications, or papers from certain publishers). Try searching by title keywords instead of full title. You can also add papers manually by DOI.' },
 				{ q: 'Is there a rate limit?', a: 'Crossref\'s public API is free and generous, but please avoid rapid-fire searches. CiteStrike makes polite requests with a proper User-Agent header.' },
+			]
+		},
+		{
+			id: 'office-addin',
+			title: 'Word & PowerPoint Add-in',
+			icon: '📎',
+			content: [
+				{ q: 'How does the Office add-in work?', a: 'CiteStrike runs a local server on port 27182 that powers an Office Web Add-in. The add-in appears as a taskpane inside Word or PowerPoint, letting you search your library and insert formatted citations directly at your cursor — just like EndNote.' },
+				{ q: 'How do I install the add-in?', a: 'To sideload the add-in:\n\n1. Make sure CiteStrike is running\n2. Open Word or PowerPoint\n3. Go to **Insert → Get Add-ins → My Add-ins → Upload My Add-in**\n4. Upload the manifest file from: **http://localhost:27182/manifest.xml** (save it as a local XML file first)\n5. The CiteStrike panel will appear in the Home ribbon tab' },
+				{ q: 'What can I do from the add-in?', a: '• **Search** your entire CiteStrike library\n• **Insert full citations** (APA, MLA, Chicago, IEEE, Harvard, Vancouver, BibTeX) directly at your cursor\n• **Insert in-text citations** like (Smith et al., 2024) or [1]\n• **Copy** formatted citations to clipboard\n• Switch citation styles from the dropdown at any time' },
+				{ q: 'Do I need to keep CiteStrike running?', a: 'Yes — the add-in connects to CiteStrike\'s local server. If CiteStrike is closed, the add-in will show "CiteStrike not running" and automatically reconnect when you reopen it.' },
 			]
 		},
 		{
@@ -128,7 +139,7 @@
 		<!-- Footer -->
 		<div class="mt-8 text-center text-[11px] text-[var(--text-muted)]">
 			<p>CiteStrike v0.1.0 — Built with Rust, Tauri & Svelte</p>
-			<p class="mt-1">Report issues at github.com/yourusername/citestrike</p>
+			<p class="mt-1">Report issues on the project's GitHub repository</p>
 		</div>
 	</div>
 </div>

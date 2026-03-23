@@ -49,7 +49,7 @@ A spotlight-style command palette appears instantly. Type the author or title, h
 | **Auto-Magic PDF Import** | Drag & drop a PDF — CiteStrike extracts the DOI via Rust, queries Crossref, and saves perfect metadata in milliseconds. |
 | **Local-First Storage** | No cloud lock-in. Everything lives in a fast SQLite database with automatic `.bib` (BibTeX) file sync. |
 | **Instant Search** | Full-text fuzzy search across 10,000+ papers with zero perceptible lag. |
-| **Universal Citation Styles** | APA 7th, MLA 9th, Chicago, IEEE, Harvard, Vancouver, and any custom CSL style. |
+| **Universal Citation Styles** | APA 7th, MLA 9th, Chicago, IEEE, Harvard, Vancouver, and BibTeX. |
 | **Smart Clipboard** | Formatted citations copied as rich text (for Word/Docs) or plain text (for LaTeX/Markdown) based on context. |
 | **Batch Operations** | Select multiple references and generate a full bibliography section in one action. |
 
@@ -67,9 +67,9 @@ CiteStrike is designed to be as lightweight and performant as possible.
 | [Tauri v2](https://tauri.app/) | Tiny, cross-platform native binary (~5 MB installed) |
 | `rusqlite` | Instantaneous local database queries |
 | `lopdf` | PDF text extraction and DOI parsing |
-| `reqwest` + `tokio` | Async API calls to Crossref & Semantic Scholar |
+| `reqwest` + `tokio` | Async API calls to the Crossref metadata service |
 | `global-hotkey` | OS-level shortcut interception for the command palette |
-| `citeproc-rs` | Citation formatting engine (CSL processor) |
+| Custom citation engine | Hand-tuned formatters for APA, MLA, Chicago, IEEE, Harvard, Vancouver, BibTeX |
 
 ### Frontend — Command Palette (Svelte)
 
@@ -103,8 +103,8 @@ CiteStrike is designed to be as lightweight and performant as possible.
 │              Rust Core Engine                         │
 │                                                      │
 │  ┌──────────┐  ┌──────────┐  ┌───────────────────┐  │
-│  │  SQLite  │  │ PDF      │  │ Crossref /        │  │
-│  │  Store   │  │ Parser   │  │ Semantic Scholar   │  │
+│  │  SQLite  │  │ PDF      │  │ Crossref           │  │
+│  │  Store   │  │ Parser   │  │ API                │  │
 │  └──────────┘  └──────────┘  └───────────────────┘  │
 │  ┌──────────┐  ┌──────────────────────────────────┐  │
 │  │  CSL     │  │ BibTeX Sync (.bib auto-export)  │  │
@@ -127,7 +127,7 @@ CiteStrike is designed to be as lightweight and performant as possible.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/citestrike.git
+git clone https://github.com/hasnainqau5112/citestrike.git
 cd citestrike
 
 # Install frontend dependencies
@@ -150,18 +150,20 @@ The installer will be output to `src-tauri/target/release/bundle/`.
 ## Roadmap
 
 - [x] Project scaffolding & README
-- [ ] Tauri v2 project initialization
-- [ ] SQLite database schema & CRUD operations
-- [ ] PDF import with DOI extraction (`lopdf`)
-- [ ] Crossref API integration for metadata fetching
-- [ ] Command palette UI (Svelte + Tailwind)
-- [ ] Global hotkey registration
-- [ ] Citation formatting engine (CSL / APA / MLA / IEEE)
-- [ ] Clipboard injection (rich text + plain text)
+- [x] Tauri v2 project initialization
+- [x] SQLite database schema & CRUD operations
+- [x] PDF import with DOI extraction (`lopdf`)
+- [x] Crossref API integration for metadata fetching
+- [x] Command palette UI (Svelte + Tailwind)
+- [x] Global hotkey registration
+- [x] Citation formatting engine (APA / MLA / Chicago / IEEE / Harvard / Vancouver / BibTeX)
+- [x] Clipboard injection (rich text + plain text)
+- [x] Batch bibliography generation
+- [x] Office Web Add-in for Word & PowerPoint
+- [x] Folder/collection management
 - [ ] Auto `.bib` file sync
 - [ ] System tray with background mode
-- [ ] Batch bibliography generation
-- [ ] Google Docs & Word plugin integration
+- [ ] Full library export to `.bib`
 
 ---
 

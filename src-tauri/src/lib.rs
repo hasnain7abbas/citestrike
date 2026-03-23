@@ -1,3 +1,4 @@
+mod api_server;
 mod citation;
 mod commands;
 mod crossref;
@@ -44,6 +45,12 @@ pub fn run() {
             let conn = Connection::open(&db_path).expect("failed to open database");
             db::init_db(&conn).expect("failed to init database");
             app.manage(DbState(Mutex::new(conn)));
+
+            // Start Office add-in API server on port 27182
+            let api_db_path = db_path.clone();
+            tauri::async_runtime::spawn(async move {
+                api_server::start_server(api_db_path).await;
+            });
 
             // Setup logging in debug
             if cfg!(debug_assertions) {

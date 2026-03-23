@@ -1,6 +1,6 @@
 [package]
 name = "citestrike"
-version = "0.1.0"
+version = "0.2.0"
 description = "A blazing-fast, local-first citation manager"
 authors = ["you"]
 license = "MIT"
@@ -30,6 +30,8 @@ reqwest = { version = "0.12", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
+axum = "0.8"
+tower-http = { version = "0.6", features = ["cors"] }
 clipboard-win = "5"
 windows = { version = "0.58", features = [
     "Win32_Foundation",

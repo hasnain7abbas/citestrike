@@ -20,7 +20,7 @@
 	<div class="flex items-center gap-2.5 pl-4" data-tauri-drag-region>
 		<img src="/logo.svg" alt="CiteStrike" class="w-5 h-5 shrink-0 rounded" />
 		<span class="text-[var(--text)] font-semibold text-[13px] tracking-tight" data-tauri-drag-region>CiteStrike</span>
-		<span class="text-[var(--text-muted)] text-[10px] font-medium tracking-wider uppercase ml-1" data-tauri-drag-region>v0.1</span>
+		<span class="text-[var(--text-muted)] text-[10px] font-medium tracking-wider uppercase ml-1" data-tauri-drag-region>v0.2</span>
 	</div>
 
 	<div class="flex items-center h-full">
