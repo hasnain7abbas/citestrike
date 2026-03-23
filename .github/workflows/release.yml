@@ -2,20 +2,13 @@ name: Release
 on:
   push:
     tags:
-      - 'v*' # Runs when you push a tag like v1.0.0
+      - 'v*' # This triggers the build when you push a tag like v1.0.0
 
 jobs:
   publish:
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'windows-latest'
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,27 +17,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-          cache: 'npm' # Change to 'yarn' or 'pnpm' if you use those
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Rust Cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
-
-      - name: Install frontend dependencies
-        run: npm install # Change to yarn/pnpm if needed
+      - name: Install dependencies
+        run: npm install
 
       - name: Build and Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: v__VERSION__ # Auto-grabs version from tauri.conf.json
+          tagName: v__VERSION__
           releaseName: 'CiteStrike v__VERSION__'
-          releaseBody: 'Automated build of CiteStrike.'
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }}
+          
