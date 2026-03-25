@@ -1,6 +1,6 @@
 [package]
 name = "citestrike"
-version = "0.2.1"
+version = "0.2.2"
 description = "A blazing-fast, local-first citation manager"
 authors = ["you"]
 license = "MIT"
