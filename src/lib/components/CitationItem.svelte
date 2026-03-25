@@ -1,17 +1,29 @@
 <script lang="ts">
 	import type { Reference, CitationStyle } from '$lib/tauri';
-	import { formatRef, deleteReference, formatInlineCitation, copyRichCitation, copyRichInline, insertCitationIntoWord, insertInlineIntoWord, insertCitationIntoPpt } from '$lib/tauri';
+	import { formatRef, deleteReference, formatInlineCitation, copyRichCitation, copyRichInline, insertCitationIntoWord, insertInlineIntoWord, insertCitationIntoPpt, citeReference, unciteReference, updateReference } from '$lib/tauri';
 
-	let { reference, selected = false, ondelete, onmove }: {
+	let { reference, selected = false, citationStyle = 'APA' as CitationStyle, ondelete, onmove, oncite, onupdate }: {
 		reference: Reference;
 		selected?: boolean;
+		citationStyle?: CitationStyle;
 		ondelete?: (id: string) => void;
 		onmove?: (id: string) => void;
+		oncite?: () => void;
+		onupdate?: (id: string) => void;
 	} = $props();
 
 	let copied = $state('');
 	let showMenu = $state(false);
 	let statusMsg = $state('');
+	let editing = $state(false);
+	let editTitle = $state('');
+	let editAuthors = $state('');
+	let editYear = $state('');
+	let editJournal = $state('');
+	let editDoi = $state('');
+	let editVolume = $state('');
+	let editIssue = $state('');
+	let editPages = $state('');
 
 	async function copyRich(style: CitationStyle) {
 		try {
@@ -68,6 +80,26 @@
 		showMenu = false;
 	}
 
+	async function handleCite() {
+		try {
+			const inline = await citeReference(reference.id, citationStyle);
+			statusMsg = `Copied: ${inline}`;
+			setTimeout(() => statusMsg = '', 2500);
+			oncite?.();
+		} catch (e) {
+			statusMsg = `${e}`;
+			setTimeout(() => statusMsg = '', 3000);
+		}
+	}
+
+	async function handleUncite() {
+		try {
+			await unciteReference(reference.id);
+			oncite?.();
+		} catch { /* */ }
+		showMenu = false;
+	}
+
 	async function handleDelete() {
 		try {
 			await deleteReference(reference.id);
@@ -75,17 +107,83 @@
 		} catch { /* */ }
 		showMenu = false;
 	}
+
+	function startEdit() {
+		editTitle = reference.title;
+		editAuthors = reference.authors;
+		editYear = reference.year?.toString() ?? '';
+		editJournal = reference.journal ?? '';
+		editDoi = reference.doi ?? '';
+		editVolume = reference.volume ?? '';
+		editIssue = reference.issue ?? '';
+		editPages = reference.pages ?? '';
+		editing = true;
+		showMenu = false;
+	}
+
+	async function saveEdit() {
+		try {
+			await updateReference(reference.id, {
+				title: editTitle,
+				authors: editAuthors,
+				year: editYear ? parseInt(editYear) : null,
+				doi: editDoi || null,
+				journal: editJournal || null,
+				volume: editVolume || null,
+				issue: editIssue || null,
+				pages: editPages || null,
+				abstract_text: reference.abstract_text,
+				url: reference.url,
+				ref_type: reference.ref_type,
+			});
+			editing = false;
+			onupdate?.(reference.id);
+		} catch (e) {
+			statusMsg = `${e}`;
+			setTimeout(() => statusMsg = '', 3000);
+		}
+	}
 </script>
 
+{#if editing}
+	<!-- Edit form -->
+	<div class="px-4 py-3 border-b border-[var(--border-light)] bg-[var(--bg-card)]">
+		<div class="space-y-2">
+			<input bind:value={editTitle} placeholder="Title *" class="w-full px-2.5 py-1.5 text-[12px] bg-[var(--bg-input)] text-[var(--text)] border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)]" />
+			<input bind:value={editAuthors} placeholder="Authors (LastName, First; LastName2, First2)" class="w-full px-2.5 py-1.5 text-[12px] bg-[var(--bg-input)] text-[var(--text)] border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)]" />
+			<div class="flex gap-2">
+				<input bind:value={editYear} placeholder="Year" type="number" class="w-20 px-2.5 py-1.5 text-[12px] bg-[var(--bg-input)] text-[var(--text)] border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)]" />
+				<input bind:value={editJournal} placeholder="Journal" class="flex-1 px-2.5 py-1.5 text-[12px] bg-[var(--bg-input)] text-[var(--text)] border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)]" />
+			</div>
+			<div class="flex gap-2">
+				<input bind:value={editDoi} placeholder="DOI" class="flex-1 px-2.5 py-1.5 text-[12px] bg-[var(--bg-input)] text-[var(--text)] border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)]" />
+				<input bind:value={editVolume} placeholder="Vol" class="w-16 px-2.5 py-1.5 text-[12px] bg-[var(--bg-input)] text-[var(--text)] border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)]" />
+				<input bind:value={editIssue} placeholder="Issue" class="w-16 px-2.5 py-1.5 text-[12px] bg-[var(--bg-input)] text-[var(--text)] border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)]" />
+				<input bind:value={editPages} placeholder="Pages" class="w-20 px-2.5 py-1.5 text-[12px] bg-[var(--bg-input)] text-[var(--text)] border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)]" />
+			</div>
+			<div class="flex gap-2 justify-end">
+				<button onclick={() => editing = false} class="px-3 py-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text)] rounded-[var(--radius-sm)] transition-colors">Cancel</button>
+				<button onclick={saveEdit} class="px-3 py-1.5 text-[11px] font-medium bg-[var(--accent)] text-white rounded-[var(--radius-sm)] hover:bg-[var(--accent-hover)] transition-colors">Save</button>
+			</div>
+		</div>
+	</div>
+{:else}
 <div
 	class="group relative px-4 py-3 border-b border-[var(--border-light)] hover:bg-[var(--bg-hover)] transition-colors
 	       {selected ? 'bg-[var(--accent-light)] border-l-2 border-l-[var(--accent)]' : ''}"
 >
 	<div class="flex items-start justify-between gap-3">
 		<div class="min-w-0 flex-1">
-			<h3 class="text-[var(--text)] font-medium text-[13px] leading-snug line-clamp-2">
-				{reference.title}
-			</h3>
+			<div class="flex items-center gap-2">
+				{#if reference.cited}
+					<span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold bg-[var(--accent)] text-white shrink-0" title="Cited #{reference.cite_order}">
+						{reference.cite_order ?? ''}
+					</span>
+				{/if}
+				<h3 class="text-[var(--text)] font-medium text-[13px] leading-snug line-clamp-2">
+					{reference.title}
+				</h3>
+			</div>
 			<p class="text-[var(--text-secondary)] text-[11px] mt-1 truncate">
 				{reference.authors}
 			</p>
@@ -113,6 +211,16 @@
 
 		<!-- Actions -->
 		<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
+			<!-- Cite button (prominent) -->
+			<button onclick={handleCite}
+				class="px-2.5 py-1 text-[10px] font-semibold rounded-[var(--radius-sm)] transition-colors
+				       {reference.cited
+				         ? 'bg-[var(--accent)] text-white'
+				         : 'bg-[var(--success-light)] text-[var(--success)] hover:bg-[var(--success)] hover:text-white'}"
+				title={reference.cited ? 'Re-copy in-text citation' : 'Cite — copies in-text citation to clipboard'}>
+				{reference.cited ? `Cited [${reference.cite_order}]` : 'Cite'}
+			</button>
+
 			<!-- Quick copy buttons (rich text) -->
 			{#each (['APA', 'MLA', 'BibTeX'] as const) as style}
 				<button onclick={() => copyRich(style)}
@@ -136,6 +244,15 @@
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div class="fixed inset-0 z-40" onclick={() => showMenu = false} onkeydown={() => {}}></div>
 					<div class="absolute right-0 top-7 z-50 w-52 bg-[var(--bg-card)] border border-[var(--border)] rounded-[var(--radius-sm)] shadow-[var(--shadow-lg)] py-1 max-h-[400px] overflow-y-auto">
+
+						<!-- Cite/Uncite -->
+						{#if reference.cited}
+							<button onclick={handleUncite}
+								class="w-full text-left px-3 py-1.5 text-[11px] text-[var(--warning)] hover:bg-[var(--bg-hover)] transition-colors">
+								Uncite this reference
+							</button>
+							<div class="h-px bg-[var(--border-light)] my-1"></div>
+						{/if}
 
 						<!-- Insert into Word -->
 						<p class="px-3 py-1 text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1.5">
@@ -194,6 +311,10 @@
 						<div class="h-px bg-[var(--border-light)] my-1"></div>
 
 						<!-- Actions -->
+						<button onclick={startEdit}
+							class="w-full text-left px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors">
+							Edit reference
+						</button>
 						{#if onmove}
 							<button onclick={() => { onmove?.(reference.id); showMenu = false; }}
 								class="w-full text-left px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors">
@@ -210,3 +331,4 @@
 		</div>
 	</div>
 </div>
+{/if}

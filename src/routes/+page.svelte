@@ -7,9 +7,13 @@
 	import {
 		searchReferences, fetchDoi, addReference, searchOnline, moveReference, getFolders,
 		copyRichBibliography, insertBibliographyIntoWord, formatBatchBibliography,
+		importPdf, copyCitedBibliography, getCitedReferences, resetCitations, writeBibtexFile,
 		type CitationStyle
 	} from '$lib/tauri';
 	import type { Reference, NewReference, Folder } from '$lib/tauri';
+	import { getCurrentWindow } from '@tauri-apps/api/window';
+	import { save } from '@tauri-apps/plugin-dialog';
+	import { onMount } from 'svelte';
 
 	// State
 	let query = $state('');
@@ -32,6 +36,23 @@
 	let bibSearch = $state('');
 	let bibSearchResults = $state<Reference[]>([]);
 	let bibPreview = $state('');
+	// Global citation style
+	let citationStyle = $state<CitationStyle>('APA');
+	// Drag and drop
+	let dragOver = $state(false);
+	let importing = $state(false);
+	// Manual entry
+	let manualTitle = $state('');
+	let manualAuthors = $state('');
+	let manualYear = $state('');
+	let manualJournal = $state('');
+	let manualDoi = $state('');
+	let manualVolume = $state('');
+	let manualIssue = $state('');
+	let manualPages = $state('');
+	let manualType = $state('article');
+	// Cited count
+	let citedCount = $state(0);
 
 	let debounceTimer: ReturnType<typeof setTimeout>;
 
@@ -54,6 +75,13 @@
 			searchReferences('', activeView === 'folder' ? activeFolderId : null)
 				.then(r => { results = r; query = ''; })
 				.catch(() => { results = []; });
+		}
+	});
+
+	// Track cited count
+	$effect(() => {
+		if (activeView === 'all' || activeView === 'folder') {
+			getCitedReferences().then(cited => { citedCount = cited.length; }).catch(() => {});
 		}
 	});
 
@@ -116,6 +144,141 @@
 		}
 	}
 
+	async function refreshResults() {
+		try {
+			results = await searchReferences(query, activeView === 'folder' ? activeFolderId : null);
+			const cited = await getCitedReferences();
+			citedCount = cited.length;
+		} catch { /* */ }
+	}
+
+	// --- Drag and Drop ---
+	onMount(() => {
+		let unlisten: (() => void) | undefined;
+		getCurrentWindow().onDragDropEvent((event) => {
+			if (event.payload.type === 'over' || event.payload.type === 'enter') {
+				dragOver = true;
+			} else if (event.payload.type === 'drop') {
+				dragOver = false;
+				handleFileDrop(event.payload.paths);
+			} else {
+				dragOver = false;
+			}
+		}).then(fn => { unlisten = fn; });
+
+		return () => { unlisten?.(); };
+	});
+
+	async function handleFileDrop(paths: string[]) {
+		const pdfPaths = paths.filter(p => p.toLowerCase().endsWith('.pdf'));
+		if (pdfPaths.length === 0) {
+			showStatus('Only PDF files are accepted', 'error');
+			return;
+		}
+
+		importing = true;
+		let successCount = 0;
+		let noDoi = 0;
+
+		for (const path of pdfPaths) {
+			try {
+				const doi = await importPdf(path);
+				const ref = await fetchDoi(doi);
+				await addReference(ref, activeFolderId);
+				successCount++;
+			} catch (e) {
+				const err = String(e);
+				if (err.includes('No DOI')) {
+					noDoi++;
+				} else {
+					showStatus(`Import error: ${err}`, 'error');
+				}
+			}
+		}
+
+		importing = false;
+
+		if (successCount > 0) {
+			showStatus(`Imported ${successCount} reference${successCount > 1 ? 's' : ''}`);
+			activeView = 'all';
+			await refreshResults();
+		}
+		if (noDoi > 0) {
+			showStatus(`${noDoi} PDF(s) had no DOI — use "Add Manually"`, 'error');
+			activeView = 'add-manual';
+		}
+	}
+
+	// --- Manual Entry ---
+	async function handleManualAdd() {
+		if (!manualTitle.trim() || !manualAuthors.trim()) {
+			showStatus('Title and Authors are required', 'error');
+			return;
+		}
+		loading = true;
+		try {
+			const newRef: NewReference = {
+				title: manualTitle.trim(),
+				authors: manualAuthors.trim(),
+				year: manualYear ? parseInt(manualYear) : null,
+				doi: manualDoi.trim() || null,
+				journal: manualJournal.trim() || null,
+				volume: manualVolume.trim() || null,
+				issue: manualIssue.trim() || null,
+				pages: manualPages.trim() || null,
+				abstract_text: null,
+				url: null,
+				ref_type: manualType,
+			};
+			await addReference(newRef, activeFolderId);
+			showStatus('Reference added to library');
+			manualTitle = ''; manualAuthors = ''; manualYear = ''; manualJournal = '';
+			manualDoi = ''; manualVolume = ''; manualIssue = ''; manualPages = '';
+			activeView = 'all';
+		} catch (e) {
+			showStatus(`Failed: ${e}`, 'error');
+		}
+		loading = false;
+	}
+
+	// --- Export BibTeX ---
+	async function handleExportBibtex() {
+		try {
+			const path = await save({
+				filters: [{ name: 'BibTeX', extensions: ['bib'] }],
+				defaultPath: 'references.bib',
+			});
+			if (path) {
+				await writeBibtexFile(path);
+				showStatus('Exported BibTeX file');
+			}
+		} catch (e) {
+			showStatus(`Export failed: ${e}`, 'error');
+		}
+	}
+
+	// --- Copy Bibliography of cited papers ---
+	async function handleCopyBibliography() {
+		try {
+			await copyCitedBibliography(citationStyle);
+			showStatus('Bibliography copied to clipboard');
+		} catch (e) {
+			showStatus(`${e}`, 'error');
+		}
+	}
+
+	// --- Reset citations ---
+	async function handleResetCitations() {
+		try {
+			await resetCitations();
+			citedCount = 0;
+			await refreshResults();
+			showStatus('All citations reset');
+		} catch (e) {
+			showStatus(`${e}`, 'error');
+		}
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (activeView === 'all' || activeView === 'folder') {
 			if (e.key === 'ArrowDown') { e.preventDefault(); selectedIndex = Math.min(selectedIndex + 1, results.length - 1); }
@@ -168,6 +331,95 @@
 						<p class="text-[11px] text-[var(--text-muted)] mt-2 text-center">
 							Metadata fetched from Crossref — supports journal articles, books, conference papers
 						</p>
+					</div>
+				</div>
+
+			{:else if activeView === 'add-manual'}
+				<!-- Manual Entry Form -->
+				<div class="flex-1 flex flex-col items-center justify-center px-6 overflow-y-auto">
+					<div class="w-full max-w-lg py-8">
+						<div class="text-center mb-6">
+							<div class="w-12 h-12 mx-auto mb-3 rounded-[var(--radius)] bg-[var(--accent-light)] flex items-center justify-center">
+								<svg class="w-6 h-6 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+								</svg>
+							</div>
+							<h2 class="text-base font-semibold text-[var(--text)]">Add Reference Manually</h2>
+							<p class="text-[12px] text-[var(--text-secondary)] mt-1">Enter the paper details directly</p>
+						</div>
+						<div class="space-y-3">
+							<div>
+								<label class="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">Title *</label>
+								<input bind:value={manualTitle} placeholder="Paper title"
+									class="w-full px-3 py-2.5 text-[13px] bg-[var(--bg-input)] text-[var(--text)] placeholder-[var(--text-muted)]
+									       border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-light)] transition-all" />
+							</div>
+							<div>
+								<label class="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">Authors *</label>
+								<input bind:value={manualAuthors} placeholder="Smith, John; Doe, Jane"
+									class="w-full px-3 py-2.5 text-[13px] bg-[var(--bg-input)] text-[var(--text)] placeholder-[var(--text-muted)]
+									       border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-light)] transition-all" />
+								<p class="text-[10px] text-[var(--text-muted)] mt-1">Format: LastName, FirstName; LastName2, FirstName2</p>
+							</div>
+							<div class="grid grid-cols-3 gap-3">
+								<div>
+									<label class="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">Year</label>
+									<input bind:value={manualYear} type="number" placeholder="2024"
+										class="w-full px-3 py-2.5 text-[13px] bg-[var(--bg-input)] text-[var(--text)] placeholder-[var(--text-muted)]
+										       border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)] transition-all" />
+								</div>
+								<div class="col-span-2">
+									<label class="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">Journal</label>
+									<input bind:value={manualJournal} placeholder="Journal name"
+										class="w-full px-3 py-2.5 text-[13px] bg-[var(--bg-input)] text-[var(--text)] placeholder-[var(--text-muted)]
+										       border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)] transition-all" />
+								</div>
+							</div>
+							<div>
+								<label class="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">DOI</label>
+								<input bind:value={manualDoi} placeholder="10.xxxx/xxxxx"
+									class="w-full px-3 py-2.5 text-[13px] bg-[var(--bg-input)] text-[var(--text)] placeholder-[var(--text-muted)]
+									       border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)] transition-all" />
+							</div>
+							<div class="grid grid-cols-4 gap-3">
+								<div>
+									<label class="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">Volume</label>
+									<input bind:value={manualVolume} placeholder="12"
+										class="w-full px-3 py-2.5 text-[13px] bg-[var(--bg-input)] text-[var(--text)] placeholder-[var(--text-muted)]
+										       border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)] transition-all" />
+								</div>
+								<div>
+									<label class="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">Issue</label>
+									<input bind:value={manualIssue} placeholder="3"
+										class="w-full px-3 py-2.5 text-[13px] bg-[var(--bg-input)] text-[var(--text)] placeholder-[var(--text-muted)]
+										       border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)] transition-all" />
+								</div>
+								<div>
+									<label class="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">Pages</label>
+									<input bind:value={manualPages} placeholder="45-67"
+										class="w-full px-3 py-2.5 text-[13px] bg-[var(--bg-input)] text-[var(--text)] placeholder-[var(--text-muted)]
+										       border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)] transition-all" />
+								</div>
+								<div>
+									<label class="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">Type</label>
+									<select bind:value={manualType}
+										class="w-full px-2 py-2.5 text-[13px] bg-[var(--bg-input)] text-[var(--text)]
+										       border border-[var(--border)] rounded-[var(--radius-sm)] outline-none focus:border-[var(--accent)] transition-all">
+										<option value="article">Article</option>
+										<option value="book">Book</option>
+										<option value="proceedings-article">Conference</option>
+										<option value="book-chapter">Chapter</option>
+										<option value="dissertation">Thesis</option>
+									</select>
+								</div>
+							</div>
+							<button onclick={handleManualAdd}
+								disabled={loading || !manualTitle.trim() || !manualAuthors.trim()}
+								class="w-full mt-2 px-4 py-2.5 bg-[var(--accent)] text-white text-[13px] font-medium rounded-[var(--radius-sm)]
+								       hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50">
+								{loading ? 'Adding...' : 'Add to Library'}
+							</button>
+						</div>
 					</div>
 				</div>
 
@@ -356,7 +608,45 @@
 									All References
 								{/if}
 							</h2>
-							<p class="text-[11px] text-[var(--text-muted)] mt-0.5">{results.length} reference{results.length !== 1 ? 's' : ''}</p>
+							<p class="text-[11px] text-[var(--text-muted)] mt-0.5">
+								{results.length} reference{results.length !== 1 ? 's' : ''}
+								{#if citedCount > 0}
+									<span class="ml-1 text-[var(--accent)]">({citedCount} cited)</span>
+								{/if}
+							</p>
+						</div>
+						<!-- Citation style + actions toolbar -->
+						<div class="flex items-center gap-2">
+							<select bind:value={citationStyle}
+								class="text-[11px] px-2 py-1.5 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg-input)] text-[var(--text)] outline-none">
+								<option value="APA">APA</option>
+								<option value="MLA">MLA</option>
+								<option value="Chicago">Chicago</option>
+								<option value="IEEE">IEEE</option>
+								<option value="Harvard">Harvard</option>
+								<option value="Vancouver">Vancouver</option>
+								<option value="BibTeX">BibTeX</option>
+							</select>
+							{#if citedCount > 0}
+								<button onclick={handleCopyBibliography}
+									class="px-2.5 py-1.5 text-[10px] font-medium rounded-[var(--radius-sm)]
+									       bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition-colors"
+									title="Copy bibliography of all cited papers">
+									Copy Bibliography
+								</button>
+								<button onclick={handleResetCitations}
+									class="px-2 py-1.5 text-[10px] font-medium rounded-[var(--radius-sm)]
+									       bg-[var(--bg-active)] text-[var(--text-muted)] hover:bg-[var(--danger-light)] hover:text-[var(--danger)] transition-colors"
+									title="Clear all citation marks">
+									Reset
+								</button>
+							{/if}
+							<button onclick={handleExportBibtex}
+								class="px-2.5 py-1.5 text-[10px] font-medium rounded-[var(--radius-sm)]
+								       bg-[var(--bg-active)] text-[var(--text-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] transition-colors"
+								title="Export all references as BibTeX file">
+								Export .bib
+							</button>
 						</div>
 					</div>
 					<SearchBar bind:value={query} placeholder={activeView === 'folder' ? 'Search this collection...' : 'Search all references...'} />
@@ -367,8 +657,11 @@
 							<CitationItem
 								reference={ref}
 								selected={i === selectedIndex}
+								{citationStyle}
 								ondelete={handleRefDelete}
 								onmove={openMoveDialog}
+								oncite={refreshResults}
+								onupdate={() => refreshResults()}
 							/>
 						{/each}
 					{:else}
@@ -382,7 +675,7 @@
 								<p class="text-[11px] mt-1 opacity-60">Try different keywords</p>
 							{:else}
 								<p class="text-[13px]">No references yet</p>
-								<p class="text-[11px] mt-1 opacity-60">Add references using "Add by DOI" or "Search Online"</p>
+								<p class="text-[11px] mt-1 opacity-60">Drop PDFs here, or use "Add by DOI" / "Search Online"</p>
 							{/if}
 						</div>
 					{/if}
@@ -390,6 +683,32 @@
 			{/if}
 		</div>
 	</div>
+
+	<!-- Drag and drop overlay -->
+	{#if dragOver}
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg)]/80 backdrop-blur-sm pointer-events-none">
+			<div class="flex flex-col items-center gap-4 p-12 border-2 border-dashed border-[var(--accent)] rounded-[var(--radius-lg)] bg-[var(--accent-light)]">
+				<svg class="w-16 h-16 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+				</svg>
+				<div class="text-center">
+					<p class="text-lg font-semibold text-[var(--accent)]">Drop PDF files here</p>
+					<p class="text-[12px] text-[var(--text-secondary)] mt-1">DOI will be extracted and metadata fetched automatically</p>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Importing overlay -->
+	{#if importing}
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg)]/80 backdrop-blur-sm">
+			<div class="flex flex-col items-center gap-3 p-8 bg-[var(--bg-card)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] border border-[var(--border)]">
+				<div class="w-8 h-8 border-3 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div>
+				<p class="text-[13px] font-medium text-[var(--text)]">Importing PDFs...</p>
+				<p class="text-[11px] text-[var(--text-muted)]">Extracting DOI and fetching metadata</p>
+			</div>
+		</div>
+	{/if}
 
 	<!-- Status toast -->
 	{#if statusMessage}

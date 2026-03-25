@@ -16,6 +16,8 @@ export interface Reference {
 	bibtex_key: string;
 	folder_id: string | null;
 	created_at: string;
+	cited: boolean;
+	cite_order: number | null;
 }
 
 export interface NewReference {
@@ -129,4 +131,41 @@ export async function insertCitationIntoPpt(reference: Reference, style: Citatio
 
 export async function insertBibliographyIntoWord(references: Reference[], style: CitationStyle): Promise<string> {
 	return invoke('insert_bibliography_into_word', { references, style });
+}
+
+// --- Citation workflow ---
+
+/** Mark a reference as cited, copy in-text citation to clipboard. Returns the inline text. */
+export async function citeReference(id: string, style: CitationStyle): Promise<string> {
+	return invoke('cite_reference', { id, style });
+}
+
+/** Unmark a reference as cited. */
+export async function unciteReference(id: string): Promise<void> {
+	return invoke('uncite_reference', { id });
+}
+
+/** Get all cited references in cite order. */
+export async function getCitedReferences(): Promise<Reference[]> {
+	return invoke('get_cited_references');
+}
+
+/** Copy the bibliography of all cited papers. Returns plain text preview. */
+export async function copyCitedBibliography(style: CitationStyle): Promise<string> {
+	return invoke('copy_cited_bibliography', { style });
+}
+
+/** Reset all citation marks. */
+export async function resetCitations(): Promise<void> {
+	return invoke('reset_citations');
+}
+
+/** Update an existing reference's metadata. */
+export async function updateReference(id: string, updated: NewReference): Promise<void> {
+	return invoke('update_reference', { id, updated });
+}
+
+/** Write BibTeX export to the given file path. */
+export async function writeBibtexFile(path: string): Promise<void> {
+	return invoke('write_bibtex_file', { path });
 }

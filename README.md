@@ -52,20 +52,69 @@ Head over to the [**Releases**](https://github.com/hasnainqau5112/citestrike/rel
 
 ---
 
+## How It Works
+
+CiteStrike is a complete citation workflow in four steps:
+
+### 1. Import Papers
+
+- **Drag & drop PDFs** onto the app window — DOI is extracted automatically and metadata fetched from Crossref
+- **Paste a DOI** directly in the "Add by DOI" view
+- **Search Crossref** by title, author, or topic and add results with one click
+- **Add manually** for papers without a DOI — fill in title, authors, year, journal, and other fields
+
+### 2. Build Your Library
+
+All imported papers appear in a scrollable reference library. Each entry shows authors, year, title, journal, and DOI. You can:
+
+- Search across your entire library with instant fuzzy matching
+- Organize references into color-coded collections (folders)
+- Edit, move, or delete any reference
+- The library persists across app restarts — everything lives in a local SQLite database
+
+### 3. Cite Papers (One Click)
+
+Click the **Cite** button on any reference. Two things happen simultaneously:
+
+1. The **in-text citation** is copied to your clipboard — `(Smith et al., 2023)` for APA, `[1]` for IEEE, etc.
+2. The paper is **marked as cited** with a numbered badge showing its citation order
+
+Paste the in-text citation wherever you're writing. Cited papers are tracked so the bibliography knows exactly which papers to include.
+
+### 4. Generate Bibliography
+
+Click **Copy Bibliography** in the toolbar. CiteStrike generates the full formatted bibliography of all cited papers in the selected citation style:
+
+- **APA / MLA / Chicago / Harvard** — sorted alphabetically by first author
+- **IEEE / Vancouver** — numbered in order of first citation
+
+The entire bibliography is copied to your clipboard as rich text (with proper italics). Paste it at the end of your document.
+
+### 5. Switch Styles Anytime
+
+Switch between APA, MLA, Chicago, IEEE, Harvard, Vancouver, or BibTeX at any time using the style selector. The in-text citation format and bibliography output update to match the selected style.
+
+---
+
 ## Key Features
 
 | Feature | Description |
 |---|---|
-| **Global Command Palette** | Summon your library over any application with <kbd>Ctrl+Shift+C</kbd>. Never leave your writing flow. |
-| **Word & PowerPoint Add-in** | A built-in Office Web Add-in — search and insert citations directly at your cursor, just like EndNote. |
-| **7 Citation Styles** | APA 7th, MLA 9th, Chicago, IEEE, Harvard, Vancouver, and BibTeX — with rich text formatting. |
-| **Auto PDF Import** | Drag & drop a PDF — CiteStrike extracts the DOI via Rust, queries Crossref, and saves perfect metadata. |
-| **Local-First Storage** | No cloud lock-in. Everything lives in a fast SQLite database on your machine. |
-| **Instant Search** | Full-text fuzzy search across your entire library with zero perceptible lag. |
-| **Smart Clipboard** | Citations copied as rich text (preserves italics in Word/Docs) or plain text (for LaTeX/Markdown). |
-| **Bibliography Builder** | Select multiple references, reorder them, preview and export a formatted bibliography. |
-| **Collection Management** | Organize references into color-coded folders. Rename, move, and delete with ease. |
-| **Dark Mode** | Automatic dark theme that follows your system preference. |
+| **Drag & Drop PDF Import** | Drop PDF files onto the window — DOI extraction and Crossref metadata lookup happen automatically |
+| **One-Click Cite** | Click "Cite" on a paper to copy the in-text citation and track it for the bibliography |
+| **Copy Bibliography** | Generate and copy a formatted bibliography of all cited papers in one click |
+| **Export .bib** | Export your entire library as a BibTeX file via native save dialog |
+| **Global Command Palette** | Summon your library over any application with <kbd>Ctrl+Shift+C</kbd> |
+| **Word & PowerPoint Add-in** | Built-in Office Web Add-in — search and insert citations directly at your cursor |
+| **7 Citation Styles** | APA 7th, MLA 9th, Chicago, IEEE, Harvard, Vancouver, and BibTeX with rich text formatting |
+| **Manual Entry** | Add references without a PDF — fill in metadata manually |
+| **Inline Editing** | Edit any reference's metadata directly from the library view |
+| **Local-First Storage** | No cloud lock-in. Everything lives in a fast SQLite database on your machine |
+| **Instant Search** | Full-text search across your entire library with zero perceptible lag |
+| **Smart Clipboard** | Citations copied as rich text (preserves italics in Word/Docs) or plain text (LaTeX/Markdown) |
+| **Bibliography Builder** | Select specific references, reorder them, preview and export a formatted bibliography |
+| **Collection Management** | Organize references into color-coded folders |
+| **Dark Mode** | Automatic dark theme that follows your system preference |
 
 ---
 
@@ -96,6 +145,7 @@ The add-in uses the official **Office.js** API to insert text at your cursor pos
 | `reqwest` + `tokio` | Async API calls to the Crossref metadata service |
 | `axum` | Local HTTP API server powering the Office add-in |
 | `clipboard-win` | Rich text (RTF) clipboard support for formatted citations |
+| `tauri-plugin-dialog` | Native file dialogs for BibTeX export |
 | Custom citation engine | Hand-tuned formatters for APA, MLA, Chicago, IEEE, Harvard, Vancouver, BibTeX |
 
 ### Frontend — UI (Svelte)
@@ -104,6 +154,7 @@ The add-in uses the official **Office.js** API to insert text at your cursor pos
 |---|---|
 | [SvelteKit](https://kit.svelte.dev/) | Compiles to tiny vanilla JS — zero virtual DOM overhead |
 | [Tailwind CSS](https://tailwindcss.com/) | Sleek, modern UI with automatic dark mode |
+| [Svelte 5 Runes](https://svelte.dev/docs/svelte/$state) | Fine-grained reactivity with `$state`, `$effect`, `$props` |
 
 ---
 
@@ -135,6 +186,19 @@ The add-in uses the official **Office.js** API to insert text at your cursor pos
 │  │  (7 styles)        │  │ (rich text copy)       │  │
 │  └────────────────────┘  └────────────────────────┘  │
 └──────────────────────────────────────────────────────┘
+```
+
+### Database Schema
+
+```sql
+refs (
+    id, title, authors, year, doi, journal, volume, issue, pages,
+    abstract_text, url, ref_type, bibtex_key, folder_id, created_at,
+    cited,        -- 0 = in library, 1 = cited in current document
+    cite_order    -- order of first citation (for IEEE/Vancouver numbering)
+)
+
+folders (id, name, color, created_at)
 ```
 
 ---
@@ -171,6 +235,27 @@ The installer will be output to `src-tauri/target/release/bundle/`.
 
 ---
 
+## Usage
+
+### Quick Start
+
+1. **Add papers** — Drag PDFs onto the window, paste a DOI, search Crossref, or enter metadata manually
+2. **Cite** — Click the **Cite** button on a reference to copy the in-text citation to your clipboard
+3. **Paste** — Switch to your document and press <kbd>Ctrl+V</kbd>
+4. **Repeat** — Cite more papers as you write
+5. **Bibliography** — Click **Copy Bibliography** to get the formatted reference list, then paste at the end of your document
+6. **Export** — Click **Export .bib** to save your entire library as a BibTeX file
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| <kbd>Ctrl+Shift+C</kbd> | Toggle CiteStrike window (global, works from any app) |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | Navigate references in the library |
+| <kbd>Enter</kbd> | Submit search / add DOI |
+
+---
+
 ## CI/CD
 
 CiteStrike uses automated GitHub Actions pipelines:
@@ -187,21 +272,27 @@ Versioning is fully automatic — every push to `main` increments the patch vers
 ## Roadmap
 
 - [x] Tauri v2 project with SQLite CRUD
-- [x] PDF import with DOI extraction
+- [x] PDF drag-and-drop import with DOI extraction
 - [x] Crossref API integration
 - [x] Command palette UI (Svelte + Tailwind)
 - [x] Global hotkey (Ctrl+Shift+C)
 - [x] Citation formatting (APA, MLA, Chicago, IEEE, Harvard, Vancouver, BibTeX)
 - [x] Rich text clipboard (RTF with italics)
+- [x] One-click cite with citation tracking
+- [x] Auto-generated bibliography from cited papers
+- [x] Manual reference entry
+- [x] Inline reference editing
+- [x] Full library export to `.bib`
 - [x] Batch bibliography builder
 - [x] Office Web Add-in for Word & PowerPoint
 - [x] Folder/collection management
 - [x] Dark mode (system preference)
 - [x] CI/CD pipeline with auto-releases
-- [ ] Auto `.bib` file sync
+- [ ] CSL (Citation Style Language) file support
 - [ ] System tray with background mode
-- [ ] Full library export to `.bib`
 - [ ] Google Docs integration
+- [ ] Duplicate detection
+- [ ] BibTeX file import
 
 ---
 
