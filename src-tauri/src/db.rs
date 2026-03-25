@@ -18,6 +18,10 @@ pub struct Reference {
     pub bibtex_key: String,
     pub folder_id: Option<String>,
     pub created_at: String,
+    #[serde(default)]
+    pub cited: bool,
+    #[serde(default)]
+    pub cite_order: Option<i32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -42,6 +46,10 @@ pub struct Folder {
     pub color: String,
     pub created_at: String,
 }
+
+const SELECT_COLS: &str = "id, title, authors, year, doi, journal, volume, issue, pages,
+                abstract_text, url, ref_type, bibtex_key, folder_id, created_at,
+                cited, cite_order";
 
 pub fn init_db(conn: &Connection) -> Result<()> {
     conn.execute_batch(
@@ -73,27 +81,30 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_refs_doi ON refs(doi);
         CREATE INDEX IF NOT EXISTS idx_refs_folder ON refs(folder_id);",
     )?;
+
+    // Migration: add cited and cite_order columns for existing databases
+    conn.execute("ALTER TABLE refs ADD COLUMN cited INTEGER DEFAULT 0", []).ok();
+    conn.execute("ALTER TABLE refs ADD COLUMN cite_order INTEGER", []).ok();
+
     Ok(())
 }
 
 pub fn search_refs(conn: &Connection, query: &str, folder_id: Option<&str>) -> Result<Vec<Reference>> {
     let pattern = format!("%{}%", query);
     let sql = if folder_id.is_some() {
-        "SELECT id, title, authors, year, doi, journal, volume, issue, pages,
-                abstract_text, url, ref_type, bibtex_key, folder_id, created_at
-         FROM refs
-         WHERE (title LIKE ?1 OR authors LIKE ?1 OR doi LIKE ?1 OR bibtex_key LIKE ?1)
-           AND folder_id = ?2
-         ORDER BY created_at DESC LIMIT 100"
+        format!(
+            "SELECT {} FROM refs
+             WHERE (title LIKE ?1 OR authors LIKE ?1 OR doi LIKE ?1 OR bibtex_key LIKE ?1)
+               AND folder_id = ?2
+             ORDER BY created_at DESC LIMIT 100", SELECT_COLS)
     } else {
-        "SELECT id, title, authors, year, doi, journal, volume, issue, pages,
-                abstract_text, url, ref_type, bibtex_key, folder_id, created_at
-         FROM refs
-         WHERE title LIKE ?1 OR authors LIKE ?1 OR doi LIKE ?1 OR bibtex_key LIKE ?1
-         ORDER BY created_at DESC LIMIT 100"
+        format!(
+            "SELECT {} FROM refs
+             WHERE title LIKE ?1 OR authors LIKE ?1 OR doi LIKE ?1 OR bibtex_key LIKE ?1
+             ORDER BY created_at DESC LIMIT 100", SELECT_COLS)
     };
 
-    let mut stmt = conn.prepare(sql)?;
+    let mut stmt = conn.prepare(&sql)?;
     let rows = if let Some(fid) = folder_id {
         stmt.query_map(params![pattern, fid], row_to_ref)?
     } else {
@@ -104,16 +115,12 @@ pub fn search_refs(conn: &Connection, query: &str, folder_id: Option<&str>) -> R
 
 pub fn get_all_refs(conn: &Connection, folder_id: Option<&str>) -> Result<Vec<Reference>> {
     let sql = if folder_id.is_some() {
-        "SELECT id, title, authors, year, doi, journal, volume, issue, pages,
-                abstract_text, url, ref_type, bibtex_key, folder_id, created_at
-         FROM refs WHERE folder_id = ?1 ORDER BY created_at DESC"
+        format!("SELECT {} FROM refs WHERE folder_id = ?1 ORDER BY created_at DESC", SELECT_COLS)
     } else {
-        "SELECT id, title, authors, year, doi, journal, volume, issue, pages,
-                abstract_text, url, ref_type, bibtex_key, folder_id, created_at
-         FROM refs ORDER BY created_at DESC"
+        format!("SELECT {} FROM refs ORDER BY created_at DESC", SELECT_COLS)
     };
 
-    let mut stmt = conn.prepare(sql)?;
+    let mut stmt = conn.prepare(&sql)?;
     let rows = if let Some(fid) = folder_id {
         stmt.query_map(params![fid], row_to_ref)?
     } else {
@@ -129,8 +136,9 @@ pub fn insert_ref(conn: &Connection, new_ref: &NewReference, folder_id: Option<&
 
     conn.execute(
         "INSERT INTO refs (id, title, authors, year, doi, journal, volume, issue, pages,
-                           abstract_text, url, ref_type, bibtex_key, folder_id, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+                           abstract_text, url, ref_type, bibtex_key, folder_id, created_at,
+                           cited, cite_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 0, NULL)",
         params![
             id, new_ref.title, new_ref.authors, new_ref.year, new_ref.doi,
             new_ref.journal, new_ref.volume, new_ref.issue, new_ref.pages,
@@ -154,6 +162,8 @@ pub fn insert_ref(conn: &Connection, new_ref: &NewReference, folder_id: Option<&
         bibtex_key,
         folder_id: folder_id.map(String::from),
         created_at,
+        cited: false,
+        cite_order: None,
     })
 }
 
@@ -167,6 +177,81 @@ pub fn move_ref_to_folder(conn: &Connection, ref_id: &str, folder_id: Option<&st
         "UPDATE refs SET folder_id = ?1 WHERE id = ?2",
         params![folder_id, ref_id],
     )?;
+    Ok(())
+}
+
+pub fn get_ref_by_id(conn: &Connection, id: &str) -> Result<Reference> {
+    let sql = format!("SELECT {} FROM refs WHERE id = ?1", SELECT_COLS);
+    conn.query_row(&sql, params![id], row_to_ref)
+}
+
+pub fn update_ref(conn: &Connection, id: &str, new_data: &NewReference) -> Result<()> {
+    let bibtex_key = generate_bibtex_key(&new_data.authors, new_data.year);
+    conn.execute(
+        "UPDATE refs SET title=?1, authors=?2, year=?3, doi=?4, journal=?5,
+         volume=?6, issue=?7, pages=?8, bibtex_key=?9, ref_type=?10,
+         abstract_text=?11, url=?12
+         WHERE id=?13",
+        params![
+            new_data.title, new_data.authors, new_data.year, new_data.doi,
+            new_data.journal, new_data.volume, new_data.issue, new_data.pages,
+            bibtex_key, new_data.ref_type, new_data.abstract_text, new_data.url, id
+        ],
+    )?;
+    Ok(())
+}
+
+/// Mark a reference as cited and assign the next cite_order.
+/// Returns the cite_order (1-based position).
+pub fn mark_cited(conn: &Connection, id: &str) -> Result<i32> {
+    // Check if already cited
+    let mut stmt = conn.prepare("SELECT cite_order FROM refs WHERE id = ?1 AND cited = 1")?;
+    let mut rows = stmt.query(params![id])?;
+
+    if let Some(row) = rows.next()? {
+        let order: Option<i32> = row.get(0)?;
+        return Ok(order.unwrap_or(1));
+    }
+    drop(rows);
+    drop(stmt);
+
+    // Get next cite_order
+    let max_order: i32 = conn.query_row(
+        "SELECT COALESCE(MAX(cite_order), 0) FROM refs WHERE cited = 1",
+        [],
+        |row| row.get(0),
+    )?;
+
+    let next_order = max_order + 1;
+
+    conn.execute(
+        "UPDATE refs SET cited = 1, cite_order = ?1 WHERE id = ?2",
+        params![next_order, id],
+    )?;
+
+    Ok(next_order)
+}
+
+pub fn unmark_cited(conn: &Connection, id: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE refs SET cited = 0, cite_order = NULL WHERE id = ?1",
+        params![id],
+    )?;
+    Ok(())
+}
+
+pub fn get_cited_refs(conn: &Connection) -> Result<Vec<Reference>> {
+    let sql = format!(
+        "SELECT {} FROM refs WHERE cited = 1 ORDER BY cite_order ASC",
+        SELECT_COLS
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map([], row_to_ref)?;
+    rows.collect()
+}
+
+pub fn reset_all_citations(conn: &Connection) -> Result<()> {
+    conn.execute("UPDATE refs SET cited = 0, cite_order = NULL", [])?;
     Ok(())
 }
 
@@ -217,6 +302,7 @@ pub fn get_ref_count(conn: &Connection, folder_id: Option<&str>) -> Result<i64> 
 }
 
 fn row_to_ref(row: &rusqlite::Row) -> rusqlite::Result<Reference> {
+    let cited_int: i32 = row.get(15)?;
     Ok(Reference {
         id: row.get(0)?,
         title: row.get(1)?,
@@ -233,6 +319,8 @@ fn row_to_ref(row: &rusqlite::Row) -> rusqlite::Result<Reference> {
         bibtex_key: row.get(12)?,
         folder_id: row.get(13)?,
         created_at: row.get(14)?,
+        cited: cited_int != 0,
+        cite_order: row.get(16)?,
     })
 }
 

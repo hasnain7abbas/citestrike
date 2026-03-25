@@ -17,6 +17,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -95,6 +96,14 @@ pub fn run() {
             commands::insert_inline_into_word,
             commands::insert_citation_into_ppt,
             commands::insert_bibliography_into_word,
+            // New citation workflow commands
+            commands::cite_reference,
+            commands::uncite_reference,
+            commands::get_cited_references,
+            commands::copy_cited_bibliography,
+            commands::reset_citations,
+            commands::update_reference,
+            commands::write_bibtex_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

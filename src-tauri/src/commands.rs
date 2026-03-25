@@ -162,3 +162,100 @@ pub fn insert_bibliography_into_word(references: Vec<Reference>, style: Citation
     rich_clipboard::copy_rtf_to_clipboard(&rtf, &plain)?;
     word_insert::insert_into_word()
 }
+
+// --- Citation workflow commands ---
+
+/// Mark a reference as cited, copy its in-text citation to clipboard, return the inline text.
+#[tauri::command]
+pub fn cite_reference(id: &str, style: CitationStyle, state: State<DbState>) -> Result<String, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::mark_cited(&conn, id).map_err(|e| e.to_string())?;
+
+    // Get the reference
+    let reference = db::get_ref_by_id(&conn, id).map_err(|e| e.to_string())?;
+
+    // For IEEE/Vancouver, we need the sequential position among all cited papers
+    let cited_refs = db::get_cited_refs(&conn).map_err(|e| e.to_string())?;
+    let position = cited_refs.iter().position(|r| r.id == id).map(|p| p + 1).unwrap_or(1);
+
+    let inline = format_inline(&reference, style, Some(position));
+
+    // Copy to clipboard
+    let rtf = rich_clipboard::inline_to_rtf(&inline);
+    rich_clipboard::copy_rtf_to_clipboard(&rtf, &inline)?;
+
+    Ok(inline)
+}
+
+/// Unmark a reference as cited.
+#[tauri::command]
+pub fn uncite_reference(id: &str, state: State<DbState>) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::unmark_cited(&conn, id).map_err(|e| e.to_string())
+}
+
+/// Get all cited references in cite_order.
+#[tauri::command]
+pub fn get_cited_references(state: State<DbState>) -> Result<Vec<Reference>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::get_cited_refs(&conn).map_err(|e| e.to_string())
+}
+
+/// Copy the bibliography of all cited papers to clipboard.
+/// APA/MLA/Chicago/Harvard → sorted alphabetically; IEEE/Vancouver → sorted by cite order.
+#[tauri::command]
+pub fn copy_cited_bibliography(style: CitationStyle, state: State<DbState>) -> Result<String, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let mut refs = db::get_cited_refs(&conn).map_err(|e| e.to_string())?;
+    drop(conn);
+
+    if refs.is_empty() {
+        return Err("No cited references".to_string());
+    }
+
+    // Sort based on style conventions
+    match style {
+        CitationStyle::IEEE | CitationStyle::Vancouver => {
+            // Already in cite_order from DB query
+        }
+        _ => {
+            // Sort alphabetically by first author's last name
+            refs.sort_by(|a, b| a.authors.to_lowercase().cmp(&b.authors.to_lowercase()));
+        }
+    }
+
+    let rtf = rich_clipboard::bibliography_to_rtf(&refs, style);
+    let plain = format_bibliography(&refs, style);
+    rich_clipboard::copy_rtf_to_clipboard(&rtf, &plain)?;
+
+    Ok(plain)
+}
+
+/// Reset all citation marks.
+#[tauri::command]
+pub fn reset_citations(state: State<DbState>) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::reset_all_citations(&conn).map_err(|e| e.to_string())
+}
+
+/// Update an existing reference's metadata.
+#[tauri::command]
+pub fn update_reference(id: String, updated: NewReference, state: State<DbState>) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::update_ref(&conn, &id, &updated).map_err(|e| e.to_string())
+}
+
+/// Write BibTeX export to the given file path.
+#[tauri::command]
+pub fn write_bibtex_file(path: String, state: State<DbState>) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let refs = db::get_all_refs(&conn, None).map_err(|e| e.to_string())?;
+    drop(conn);
+
+    let content = refs.iter()
+        .map(|r| format_citation(r, CitationStyle::BibTeX))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+
+    std::fs::write(&path, content).map_err(|e| e.to_string())
+}
