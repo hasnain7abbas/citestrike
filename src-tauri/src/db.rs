@@ -168,7 +168,36 @@ pub fn insert_ref(conn: &Connection, new_ref: &NewReference, folder_id: Option<&
 }
 
 pub fn delete_ref(conn: &Connection, id: &str) -> Result<()> {
+    // Check if this ref was cited before deleting
+    let was_cited: bool = conn
+        .query_row("SELECT cited FROM refs WHERE id = ?1", params![id], |row| {
+            let v: i32 = row.get(0)?;
+            Ok(v != 0)
+        })
+        .unwrap_or(false);
+
     conn.execute("DELETE FROM refs WHERE id = ?1", params![id])?;
+
+    // Renumber remaining cite_orders so there are no gaps (important for IEEE/Vancouver)
+    if was_cited {
+        renumber_citations(conn)?;
+    }
+    Ok(())
+}
+
+fn renumber_citations(conn: &Connection) -> Result<()> {
+    let mut stmt = conn.prepare("SELECT id FROM refs WHERE cited = 1 ORDER BY cite_order ASC")?;
+    let ids: Vec<String> = stmt
+        .query_map([], |row| row.get(0))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    for (i, id) in ids.iter().enumerate() {
+        conn.execute(
+            "UPDATE refs SET cite_order = ?1 WHERE id = ?2",
+            params![(i + 1) as i32, id],
+        )?;
+    }
     Ok(())
 }
 

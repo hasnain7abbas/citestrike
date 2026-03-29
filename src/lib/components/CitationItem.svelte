@@ -2,19 +2,21 @@
 	import type { Reference, CitationStyle } from '$lib/tauri';
 	import { formatRef, deleteReference, formatInlineCitation, copyRichCitation, copyRichInline, insertCitationIntoWord, insertInlineIntoWord, insertCitationIntoPpt, citeReference, unciteReference, updateReference } from '$lib/tauri';
 
-	let { reference, selected = false, citationStyle = 'APA' as CitationStyle, ondelete, onmove, oncite, onupdate }: {
+	let { reference, selected = false, citationStyle = 'APA' as CitationStyle, ondelete, onmove, oncite, oncitetext, onupdate }: {
 		reference: Reference;
 		selected?: boolean;
 		citationStyle?: CitationStyle;
 		ondelete?: (id: string) => void;
 		onmove?: (id: string) => void;
 		oncite?: () => void;
+		oncitetext?: (text: string) => void;
 		onupdate?: (id: string) => void;
 	} = $props();
 
 	let copied = $state('');
 	let showMenu = $state(false);
 	let statusMsg = $state('');
+	let showDeleteConfirm = $state(false);
 	let editing = $state(false);
 	let editTitle = $state('');
 	let editAuthors = $state('');
@@ -86,6 +88,7 @@
 			statusMsg = `Copied: ${inline}`;
 			setTimeout(() => statusMsg = '', 2500);
 			oncite?.();
+			oncitetext?.(`Copied: ${inline}`);
 		} catch (e) {
 			statusMsg = `${e}`;
 			setTimeout(() => statusMsg = '', 3000);
@@ -100,12 +103,17 @@
 		showMenu = false;
 	}
 
-	async function handleDelete() {
+	function handleDelete() {
+		showDeleteConfirm = true;
+		showMenu = false;
+	}
+
+	async function confirmDelete() {
 		try {
 			await deleteReference(reference.id);
 			ondelete?.(reference.id);
 		} catch { /* */ }
-		showMenu = false;
+		showDeleteConfirm = false;
 	}
 
 	function startEdit() {
@@ -231,6 +239,14 @@
 				</button>
 			{/each}
 
+			<!-- Delete button (visible) -->
+			<button onclick={handleDelete}
+				class="p-1 rounded-[var(--radius-sm)] hover:bg-[var(--danger-light)] transition-colors" title="Delete reference">
+				<svg class="w-3.5 h-3.5 text-[var(--text-muted)] hover:text-[var(--danger)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+					<path stroke-linecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+				</svg>
+			</button>
+
 			<!-- More menu -->
 			<div class="relative">
 				<button onclick={() => showMenu = !showMenu}
@@ -331,4 +347,31 @@
 		</div>
 	</div>
 </div>
+
+{#if showDeleteConfirm}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onclick={() => showDeleteConfirm = false} onkeydown={() => {}}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="bg-[var(--bg-card)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] w-80 p-5 border border-[var(--border)]"
+			onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
+			<h3 class="text-[13px] font-semibold text-[var(--text)] mb-2">Delete Reference</h3>
+			<p class="text-[12px] text-[var(--text-secondary)] mb-4 leading-relaxed">
+				Remove <strong class="text-[var(--text)]">{reference.title.length > 60 ? reference.title.slice(0, 60) + '...' : reference.title}</strong> from library?
+				{#if reference.cited}
+					<br /><span class="text-[var(--warning)] text-[11px] mt-1 inline-block">This paper is currently cited. Its citation will be removed.</span>
+				{/if}
+			</p>
+			<div class="flex gap-2 justify-end">
+				<button onclick={() => showDeleteConfirm = false}
+					class="px-3 py-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text)] rounded-[var(--radius-sm)] transition-colors">
+					Cancel
+				</button>
+				<button onclick={confirmDelete}
+					class="px-3 py-1.5 text-[11px] font-medium bg-[var(--danger)] text-white rounded-[var(--radius-sm)] hover:opacity-90 transition-colors">
+					Delete
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
 {/if}

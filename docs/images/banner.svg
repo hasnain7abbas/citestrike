@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a5f;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a78bfa;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="300" rx="16" fill="url(#bg)"/>
+
+  <!-- Decorative circles -->
+  <circle cx="100" cy="150" r="180" fill="rgba(255,255,255,0.03)"/>
+  <circle cx="1100" cy="150" r="200" fill="rgba(255,255,255,0.03)"/>
+  <circle cx="600" cy="300" r="250" fill="rgba(255,255,255,0.02)"/>
+
+  <!-- Subtle grid pattern -->
+  <line x1="200" y1="0" x2="200" y2="300" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="400" y1="0" x2="400" y2="300" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="600" y1="0" x2="600" y2="300" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="800" y1="0" x2="800" y2="300" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="1000" y1="0" x2="1000" y2="300" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+
+  <!-- Icon: book/citation -->
+  <g transform="translate(460, 55)" filter="url(#glow)">
+    <rect x="0" y="0" width="52" height="64" rx="6" fill="none" stroke="url(#accent)" stroke-width="2.5"/>
+    <rect x="8" y="8" width="52" height="64" rx="6" fill="none" stroke="url(#accent)" stroke-width="2.5" opacity="0.6"/>
+    <line x1="14" y1="30" x2="46" y2="30" stroke="url(#accent)" stroke-width="2" opacity="0.8"/>
+    <line x1="14" y1="40" x2="40" y2="40" stroke="url(#accent)" stroke-width="2" opacity="0.6"/>
+    <line x1="14" y1="50" x2="36" y2="50" stroke="url(#accent)" stroke-width="2" opacity="0.4"/>
+  </g>
+
+  <!-- Title -->
+  <text x="540" y="110" font-family="Segoe UI, system-ui, -apple-system, sans-serif" font-size="56" font-weight="700" fill="white" letter-spacing="-1">CiteStrike</text>
+
+  <!-- Tagline -->
+  <text x="600" y="155" font-family="Segoe UI, system-ui, -apple-system, sans-serif" font-size="18" fill="rgba(255,255,255,0.8)" text-anchor="middle" letter-spacing="0.5">Blazing-fast, local-first citation manager built with Rust + Tauri</text>
+
+  <!-- Divider line -->
+  <line x1="440" y1="175" x2="760" y2="175" stroke="url(#accent)" stroke-width="1.5" opacity="0.4"/>
+
+  <!-- Stats pills -->
+  <g transform="translate(335, 195)">
+    <rect x="0" y="0" width="120" height="32" rx="16" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+    <text x="60" y="21" font-family="Segoe UI, system-ui, sans-serif" font-size="13" fill="rgba(255,255,255,0.9)" text-anchor="middle" font-weight="600">&lt; 15 MB RAM</text>
+  </g>
+  <g transform="translate(475, 195)">
+    <rect x="0" y="0" width="130" height="32" rx="16" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+    <text x="65" y="21" font-family="Segoe UI, system-ui, sans-serif" font-size="13" fill="rgba(255,255,255,0.9)" text-anchor="middle" font-weight="600">&lt; 200ms startup</text>
+  </g>
+  <g transform="translate(625, 195)">
+    <rect x="0" y="0" width="110" height="32" rx="16" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+    <text x="55" y="21" font-family="Segoe UI, system-ui, sans-serif" font-size="13" fill="rgba(255,255,255,0.9)" text-anchor="middle" font-weight="600">7 Cite Styles</text>
+  </g>
+  <g transform="translate(755, 195)">
+    <rect x="0" y="0" width="110" height="32" rx="16" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+    <text x="55" y="21" font-family="Segoe UI, system-ui, sans-serif" font-size="13" fill="rgba(255,255,255,0.9)" text-anchor="middle" font-weight="600">100% Local</text>
+  </g>
+
+  <!-- Bottom accent line -->
+  <rect x="0" y="292" width="1200" height="8" rx="0" fill="url(#accent)" opacity="0.6"/>
+</svg>

@@ -12,7 +12,7 @@
 	} from '$lib/tauri';
 	import type { Reference, NewReference, Folder } from '$lib/tauri';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
-	import { save } from '@tauri-apps/plugin-dialog';
+	import { save, open } from '@tauri-apps/plugin-dialog';
 	import { onMount } from 'svelte';
 
 	// State
@@ -38,6 +38,9 @@
 	let bibPreview = $state('');
 	// Global citation style
 	let citationStyle = $state<CitationStyle>('APA');
+	// Auto bibliography
+	let autoBibRefs = $state<Reference[]>([]);
+	let autoBibPreview = $state('');
 	// Drag and drop
 	let dragOver = $state(false);
 	let importing = $state(false);
@@ -82,6 +85,27 @@
 	$effect(() => {
 		if (activeView === 'all' || activeView === 'folder') {
 			getCitedReferences().then(cited => { citedCount = cited.length; }).catch(() => {});
+		}
+	});
+
+	// Auto-load cited refs + preview when switching to bibliography view or style changes
+	$effect(() => {
+		if (activeView === 'bibliography') {
+			const style = bibStyle;
+			getCitedReferences().then(async (refs) => {
+				// Sort: IEEE/Vancouver by cite_order, others alphabetically
+				if (style === 'IEEE' || style === 'Vancouver') {
+					refs.sort((a, b) => (a.cite_order ?? 0) - (b.cite_order ?? 0));
+				} else {
+					refs.sort((a, b) => a.authors.toLowerCase().localeCompare(b.authors.toLowerCase()));
+				}
+				autoBibRefs = refs;
+				if (refs.length > 0) {
+					autoBibPreview = await formatBatchBibliography(refs, style);
+				} else {
+					autoBibPreview = '';
+				}
+			}).catch(() => { autoBibRefs = []; autoBibPreview = ''; });
 		}
 	});
 
@@ -206,6 +230,18 @@
 		if (noDoi > 0) {
 			showStatus(`${noDoi} PDF(s) had no DOI — use "Add Manually"`, 'error');
 			activeView = 'add-manual';
+		}
+	}
+
+	// --- Add PDFs via file dialog ---
+	async function handleAddPdfs() {
+		const selected = await open({
+			multiple: true,
+			filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
+		});
+		if (selected) {
+			const paths = Array.isArray(selected) ? selected : [selected];
+			await handleFileDrop(paths);
 		}
 	}
 
@@ -476,123 +512,87 @@
 				</div>
 
 			{:else if activeView === 'bibliography'}
-				<!-- Bibliography Builder -->
+				<!-- Auto Bibliography — shows all cited papers -->
 				<div class="flex-1 flex flex-col min-h-0">
 					<div class="p-4 border-b border-[var(--border-light)]">
-						<div class="flex items-center justify-between mb-3">
+						<div class="flex items-center justify-between">
 							<div>
-								<h2 class="text-sm font-semibold text-[var(--text)]">Bibliography Builder</h2>
+								<h2 class="text-sm font-semibold text-[var(--text)]">Bibliography</h2>
 								<p class="text-[11px] text-[var(--text-muted)] mt-0.5">
-									Add references, reorder them, then export as a formatted bibliography.
-									{#if bibStyle === 'IEEE'} IEEE references are auto-numbered [1], [2], etc.{:else if bibStyle === 'Vancouver'} Vancouver references are auto-numbered 1., 2., etc.{/if}
+									{autoBibRefs.length} cited paper{autoBibRefs.length !== 1 ? 's' : ''} — cite papers from "All References" and they appear here automatically.
 								</p>
 							</div>
-							<select bind:value={bibStyle}
-								onchange={async () => { if (bibRefs.length) bibPreview = await formatBatchBibliography(bibRefs, bibStyle); }}
-								class="text-[11px] px-2 py-1.5 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg-input)] text-[var(--text)] outline-none">
-								<option value="APA">APA</option>
-								<option value="MLA">MLA</option>
-								<option value="Chicago">Chicago</option>
-								<option value="IEEE">IEEE</option>
-								<option value="Harvard">Harvard</option>
-								<option value="Vancouver">Vancouver</option>
-								<option value="BibTeX">BibTeX</option>
-							</select>
-						</div>
-						<div class="flex gap-2">
-							<div class="flex-1">
-								<SearchBar bind:value={bibSearch} placeholder="Search library to add references..." onsubmit={async () => {
-									bibSearchResults = await searchReferences(bibSearch);
-								}} />
+							<div class="flex items-center gap-2">
+								<select bind:value={bibStyle}
+									class="text-[11px] px-2 py-1.5 border border-[var(--border)] rounded-[var(--radius-sm)] bg-[var(--bg-input)] text-[var(--text)] outline-none">
+									<option value="APA">APA</option>
+									<option value="MLA">MLA</option>
+									<option value="Chicago">Chicago</option>
+									<option value="IEEE">IEEE</option>
+									<option value="Harvard">Harvard</option>
+									<option value="Vancouver">Vancouver</option>
+									<option value="BibTeX">BibTeX</option>
+								</select>
+								<button onclick={async () => {
+									if (autoBibRefs.length) {
+										try { await copyCitedBibliography(bibStyle); showStatus('Bibliography copied to clipboard'); }
+										catch { showStatus('Copy failed', 'error'); }
+									}
+								}}
+									class="px-3 py-1.5 text-[11px] font-medium rounded-[var(--radius-sm)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition-colors"
+									disabled={!autoBibRefs.length}>
+									Copy Bibliography
+								</button>
+								<button onclick={async () => {
+									if (autoBibRefs.length) {
+										try { await insertBibliographyIntoWord(autoBibRefs, bibStyle); showStatus('Inserted into Word'); }
+										catch (e) { showStatus(`${e}`, 'error'); }
+									}
+								}}
+									class="px-3 py-1.5 text-[11px] font-medium rounded-[var(--radius-sm)] bg-[var(--bg-active)] text-[var(--text-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] transition-colors"
+									disabled={!autoBibRefs.length}>
+									Insert into Word
+								</button>
 							</div>
 						</div>
 					</div>
-					<div class="flex-1 flex min-h-0">
-						<!-- Left: search results -->
-						<div class="w-1/2 border-r border-[var(--border-light)] overflow-y-auto">
-							{#if bibSearchResults.length > 0}
-								{#each bibSearchResults as ref}
-									{@const alreadyAdded = bibRefs.some(r => r.id === ref.id)}
-									<div class="px-4 py-2.5 border-b border-[var(--border-light)] hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-3">
-										<div class="min-w-0 flex-1">
-											<p class="text-[12px] text-[var(--text)] font-medium truncate">{ref.title}</p>
-											<p class="text-[10px] text-[var(--text-muted)] truncate">{ref.authors}{ref.year ? ` (${ref.year})` : ''}</p>
-										</div>
-										<button
-											onclick={async () => { if (!alreadyAdded) { bibRefs = [...bibRefs, ref]; bibPreview = await formatBatchBibliography(bibRefs, bibStyle); } }}
-											disabled={alreadyAdded}
-											class="shrink-0 px-2.5 py-1 text-[10px] font-medium rounded-[var(--radius-sm)] transition-colors
-											       {alreadyAdded ? 'bg-[var(--bg-active)] text-[var(--text-muted)]' : 'bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]'}">
-											{alreadyAdded ? 'Added' : '+ Add'}
-										</button>
+					<div class="flex-1 overflow-y-auto">
+						{#if autoBibRefs.length > 0}
+							<!-- Cited papers list -->
+							{#each autoBibRefs as ref, i}
+								<div class="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--border-light)] hover:bg-[var(--bg-hover)] transition-colors">
+									<span class="text-[11px] font-mono text-[var(--accent)] w-7 shrink-0 text-right">
+										{#if bibStyle === 'IEEE'}[{i+1}]{:else if bibStyle === 'Vancouver'}{i+1}.{:else}{i+1}{/if}
+									</span>
+									<div class="min-w-0 flex-1">
+										<p class="text-[12px] text-[var(--text)] font-medium leading-snug line-clamp-2">{ref.title}</p>
+										<p class="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">
+											{ref.authors}{ref.year ? ` (${ref.year})` : ''}
+											{#if ref.journal}<span class="italic"> — {ref.journal}</span>{/if}
+										</p>
 									</div>
-								{/each}
-							{:else}
-								<div class="flex flex-col items-center justify-center h-full text-[var(--text-muted)] px-4">
-									<p class="text-[12px]">Search your library to add references</p>
-									<p class="text-[10px] mt-1 opacity-60">They'll appear in the bibliography on the right</p>
+								</div>
+							{/each}
+
+							<!-- Live preview -->
+							{#if autoBibPreview}
+								<div class="px-4 py-4 border-t-2 border-[var(--border)]">
+									<p class="text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">Formatted Preview</p>
+									<pre class="text-[11px] text-[var(--text-secondary)] whitespace-pre-wrap font-[inherit] leading-relaxed">{autoBibPreview}</pre>
 								</div>
 							{/if}
-						</div>
-						<!-- Right: ordered bibliography -->
-						<div class="w-1/2 flex flex-col">
-							<div class="px-4 py-2 border-b border-[var(--border-light)] flex items-center justify-between">
-								<p class="text-[11px] font-semibold text-[var(--text-secondary)]">{bibRefs.length} ref{bibRefs.length !== 1 ? 's' : ''}</p>
-								<div class="flex gap-1.5">
-									<button onclick={async () => {
-										if (bibRefs.length) { try { await copyRichBibliography(bibRefs, bibStyle); showStatus('Bibliography copied (rich text)'); } catch { showStatus('Copy failed', 'error'); } }
-									}} class="px-2.5 py-1 text-[10px] font-medium rounded-[var(--radius-sm)] bg-[var(--bg-active)] text-[var(--text-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] transition-colors" disabled={!bibRefs.length}>
-										Copy RTF
-									</button>
-									<button onclick={async () => {
-										if (bibRefs.length) { try { const t = await insertBibliographyIntoWord(bibRefs, bibStyle); showStatus('Inserted into Word'); } catch (e) { showStatus(`${e}`, 'error'); } }
-									}} class="px-2.5 py-1 text-[10px] font-medium rounded-[var(--radius-sm)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition-colors" disabled={!bibRefs.length}>
-										Insert into Word
-									</button>
-								</div>
+						{:else}
+							<div class="flex flex-col items-center justify-center h-full text-[var(--text-muted)] px-6">
+								<svg class="w-12 h-12 mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+								</svg>
+								<p class="text-[13px] font-medium">No papers cited yet</p>
+								<p class="text-[11px] mt-1.5 opacity-60 text-center leading-relaxed">
+									Go to "All References" and click <strong>Cite</strong> on any paper.<br />
+									It will automatically appear here in the bibliography.
+								</p>
 							</div>
-							<div class="flex-1 overflow-y-auto">
-								{#if bibRefs.length > 0}
-									{#each bibRefs as ref, i}
-										<div class="flex items-center gap-2 px-4 py-2 border-b border-[var(--border-light)] group hover:bg-[var(--bg-hover)]">
-											<span class="text-[11px] font-mono text-[var(--accent)] w-6 shrink-0">
-												{#if bibStyle === 'IEEE'}[{i+1}]{:else if bibStyle === 'Vancouver'}{i+1}.{:else}{i+1}.{/if}
-											</span>
-											<div class="min-w-0 flex-1">
-												<p class="text-[11px] text-[var(--text)] truncate">{ref.title}</p>
-												<p class="text-[9px] text-[var(--text-muted)] truncate">{ref.authors}</p>
-											</div>
-											<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-												{#if i > 0}
-													<button onclick={() => { const a=[...bibRefs]; [a[i-1],a[i]]=[a[i],a[i-1]]; bibRefs=a; formatBatchBibliography(bibRefs,bibStyle).then(p=>bibPreview=p); }} class="p-0.5 rounded hover:bg-[var(--bg-active)]" title="Move up">
-														<svg class="w-3 h-3 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
-													</button>
-												{/if}
-												{#if i < bibRefs.length - 1}
-													<button onclick={() => { const a=[...bibRefs]; [a[i],a[i+1]]=[a[i+1],a[i]]; bibRefs=a; formatBatchBibliography(bibRefs,bibStyle).then(p=>bibPreview=p); }} class="p-0.5 rounded hover:bg-[var(--bg-active)]" title="Move down">
-														<svg class="w-3 h-3 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-													</button>
-												{/if}
-												<button onclick={() => { bibRefs=bibRefs.filter((_,idx)=>idx!==i); if(bibRefs.length) formatBatchBibliography(bibRefs,bibStyle).then(p=>bibPreview=p); else bibPreview=''; }} class="p-0.5 rounded hover:bg-[var(--danger-light)]" title="Remove">
-													<svg class="w-3 h-3 text-[var(--text-muted)] hover:text-[var(--danger)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-												</button>
-											</div>
-										</div>
-									{/each}
-									{#if bibPreview}
-										<div class="px-4 py-3 border-t border-[var(--border)]">
-											<p class="text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Preview</p>
-											<pre class="text-[11px] text-[var(--text-secondary)] whitespace-pre-wrap font-[inherit] leading-relaxed">{bibPreview}</pre>
-										</div>
-									{/if}
-								{:else}
-									<div class="flex flex-col items-center justify-center h-full text-[var(--text-muted)]">
-										<p class="text-[12px]">No references added yet</p>
-										<p class="text-[10px] mt-1 opacity-60">Search and add from the left panel</p>
-									</div>
-								{/if}
-							</div>
-						</div>
+						{/if}
 					</div>
 				</div>
 
@@ -600,20 +600,29 @@
 				<!-- Library view (all or folder) -->
 				<div class="p-4 border-b border-[var(--border-light)]">
 					<div class="flex items-center justify-between mb-3">
-						<div>
-							<h2 class="text-sm font-semibold text-[var(--text)]">
-								{#if activeView === 'folder'}
-									{folders.find(f => f.id === activeFolderId)?.name ?? 'Collection'}
-								{:else}
-									All References
-								{/if}
-							</h2>
-							<p class="text-[11px] text-[var(--text-muted)] mt-0.5">
-								{results.length} reference{results.length !== 1 ? 's' : ''}
-								{#if citedCount > 0}
-									<span class="ml-1 text-[var(--accent)]">({citedCount} cited)</span>
-								{/if}
-							</p>
+						<div class="flex items-center gap-2.5">
+							<button onclick={handleAddPdfs}
+								class="w-9 h-9 flex items-center justify-center rounded-[var(--radius)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition-colors shadow-sm shrink-0"
+								title="Add PDFs from file explorer">
+								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2">
+									<path stroke-linecap="round" d="M12 5v14m-7-7h14"/>
+								</svg>
+							</button>
+							<div>
+								<h2 class="text-sm font-semibold text-[var(--text)]">
+									{#if activeView === 'folder'}
+										{folders.find(f => f.id === activeFolderId)?.name ?? 'Collection'}
+									{:else}
+										All References
+									{/if}
+								</h2>
+								<p class="text-[11px] text-[var(--text-muted)] mt-0.5">
+									{results.length} reference{results.length !== 1 ? 's' : ''}
+									{#if citedCount > 0}
+										<span class="ml-1 text-[var(--accent)]">({citedCount} cited)</span>
+									{/if}
+								</p>
+							</div>
 						</div>
 						<!-- Citation style + actions toolbar -->
 						<div class="flex items-center gap-2">
@@ -661,6 +670,7 @@
 								ondelete={handleRefDelete}
 								onmove={openMoveDialog}
 								oncite={refreshResults}
+								oncitetext={(text) => showStatus(text)}
 								onupdate={() => refreshResults()}
 							/>
 						{/each}
